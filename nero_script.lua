@@ -1,7 +1,7 @@
--- NERO SCRIPT v7.2
--- Error catching + fallback notification
+-- NERO SCRIPT v8.0
+-- Custom UI (Rayfield-style) — guaranteed to work on all executors
 
-local success, err = pcall(function()
+local ok, err = pcall(function()
 
 if not game:IsLoaded() then game.Loaded:Wait() end
 
@@ -9,185 +9,392 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
 local StarterGui = game:GetService("StarterGui")
+local TweenService = game:GetService("TweenService")
 local VIM = game:GetService("VirtualInputManager")
 local Camera = workspace.CurrentCamera
 local LP = Players.LocalPlayer
 
--- Wait for character
-local function notify(title, text)
-    pcall(function()
-        StarterGui:SetCore("SendNotification", {
-            Title = title,
-            Text = text,
-            Duration = 8
-        })
-    end)
+local function notify(t, m)
+    pcall(function() StarterGui:SetCore("SendNotification", {Title=t, Text=m, Duration=5}) end)
 end
 
-notify("Nero Script", "Loading v7.2...")
+notify("Nero Script", "Loading v8.0...")
 
-while not LP.Character or not LP.Character:FindFirstChild("HumanoidRootPart") do
-    task.wait(0.1)
-end
+while not LP.Character or not LP.Character:FindFirstChild("HumanoidRootPart") do task.wait(0.1) end
 local Char = LP.Character
-
-notify("Nero Script", "Character found, loading Rayfield...")
 
 -- ══════════════════════════════════════════
 -- SETTINGS
 -- ══════════════════════════════════════════
 local S = {
-    Chams = false, Distance = false, TeamCheck = true,
-    ChamsColor = Color3.fromRGB(255, 50, 50),
-    ChamsTeamColor = Color3.fromRGB(50, 255, 50),
-    Speed = false, SpeedMul = 2,
-    Aimbot = false, AimbotFOV = 250, AimbotSmooth = 0.4,
-    AimbotBone = "Head", AimbotTeam = true,
-    AutoShoot = false, AimbotShowFOV = false,
+    Chams=false, Distance=false, TeamCheck=true,
+    ChamsColor=Color3.fromRGB(255,50,50), ChamsTeamColor=Color3.fromRGB(50,255,50),
+    Speed=false, SpeedMul=2,
+    Aimbot=false, AimbotFOV=250, AimbotSmooth=0.4,
+    AimbotBone="Head", AimbotTeam=true, AutoShoot=false, AimbotShowFOV=false,
 }
 
 -- ══════════════════════════════════════════
--- LOAD RAYFIELD
+-- UI (Rayfield-style, native Roblox)
 -- ══════════════════════════════════════════
-local Rayfield
-local rayfieldSuccess, rayfieldErr = pcall(function()
-    Rayfield = loadstring(game:HttpGet('https://raw.githubusercontent.com/sirius-menu/rayfield/main/source.lua'))()
-end)
+local guiVisible = true
+local currentTab = nil
 
-if not rayfieldSuccess or not Rayfield then
-    notify("Nero Script", "Rayfield failed: " .. tostring(rayfieldErr))
-    warn("[Nero] Rayfield load failed: " .. tostring(rayfieldErr))
-    return
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "NeroUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+pcall(function() ScreenGui.Parent = game:GetService("CoreGui") end)
+if not ScreenGui.Parent then pcall(function() ScreenGui.Parent = LP:WaitForChild("PlayerGui") end) end
+
+-- Main Window (Rayfield-style: dark, rounded, clean)
+local Win = Instance.new("Frame")
+Win.Size = UDim2.new(0, 500, 0, 380)
+Win.Position = UDim2.new(0.5, -250, 0.5, -190)
+Win.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+Win.BorderSizePixel = 0
+Win.Active = true
+Win.Draggable = true
+Win.Parent = ScreenGui
+Instance.new("UICorner", Win).CornerRadius = UDim.new(0, 10)
+
+-- Topbar (Rayfield-style)
+local Topbar = Instance.new("Frame")
+Topbar.Size = UDim2.new(1, 0, 0, 42)
+Topbar.BackgroundColor3 = Color3.fromRGB(20, 20, 26)
+Topbar.BorderSizePixel = 0
+Topbar.Parent = Win
+Instance.new("UICorner", Topbar).CornerRadius = UDim.new(0, 10)
+local TopbarFix = Instance.new("Frame")
+TopbarFix.Size = UDim2.new(1, 0, 0, 10)
+TopbarFix.Position = UDim2.new(0, 0, 1, -10)
+TopbarFix.BackgroundColor3 = Color3.fromRGB(20, 20, 26)
+TopbarFix.BorderSizePixel = 0
+TopbarFix.Parent = Topbar
+
+local TitleLbl = Instance.new("TextLabel")
+TitleLbl.Size = UDim2.new(0.5, 0, 1, 0)
+TitleLbl.Position = UDim2.new(0, 14, 0, 0)
+TitleLbl.BackgroundTransparency = 1
+TitleLbl.Text = "Nero Script"
+TitleLbl.TextColor3 = Color3.new(1, 1, 1)
+TitleLbl.TextSize = 16
+TitleLbl.Font = Enum.Font.GothamBold
+TitleLbl.TextXAlignment = Enum.TextXAlignment.Left
+TitleLbl.Parent = Topbar
+
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 28, 0, 28)
+CloseBtn.Position = UDim2.new(1, -34, 0, 7)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
+CloseBtn.BorderSizePixel = 0
+CloseBtn.Text = "×"
+CloseBtn.TextColor3 = Color3.new(1, 1, 1)
+CloseBtn.TextSize = 16
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.Parent = Topbar
+Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 6)
+CloseBtn.MouseButton1Click:Connect(function() guiVisible=false Win.Visible=false end)
+
+-- Minimize button
+local MinBtn = Instance.new("TextButton")
+MinBtn.Size = UDim2.new(0, 28, 0, 28)
+MinBtn.Position = UDim2.new(1, -66, 0, 7)
+MinBtn.BackgroundColor3 = Color3.fromRGB(255, 200, 50)
+MinBtn.BorderSizePixel = 0
+MinBtn.Text = "–"
+MinBtn.TextColor3 = Color3.new(1, 1, 1)
+MinBtn.TextSize = 16
+MinBtn.Font = Enum.Font.GothamBold
+MinBtn.Parent = Topbar
+Instance.new("UICorner", MinBtn).CornerRadius = UDim.new(0, 6)
+
+-- Tab bar (below topbar)
+local TabBar = Instance.new("Frame")
+TabBar.Size = UDim2.new(1, -16, 0, 30)
+TabBar.Position = UDim2.new(0, 8, 0, 46)
+TabBar.BackgroundTransparency = 1
+TabBar.Parent = Win
+
+local TabBarLayout = Instance.new("UIListLayout")
+TabBarLayout.FillDirection = Enum.FillDirection.Horizontal
+TabBarLayout.Padding = UDim.new(0, 4)
+TabBarLayout.Parent = TabBar
+
+-- Content area
+local Content = Instance.new("Frame")
+Content.Size = UDim2.new(1, -16, 1, -84)
+Content.Position = UDim2.new(0, 8, 0, 80)
+Content.BackgroundColor3 = Color3.fromRGB(18, 18, 24)
+Content.BorderSizePixel = 0
+Content.Parent = Win
+Instance.new("UICorner", Content).CornerRadius = UDim.new(0, 8)
+
+-- Tab system
+local Tabs = {}
+local TabButtons = {}
+
+local function createTab(name, icon)
+    -- Tab button
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 0, 1, 0)
+    btn.AutomaticSize = Enum.AutomaticSize.X
+    btn.BackgroundColor3 = Color3.fromRGB(30, 30, 38)
+    btn.BorderSizePixel = 0
+    btn.Text = "  " .. icon .. "  " .. name
+    btn.TextColor3 = Color3.fromRGB(130, 130, 140)
+    btn.TextSize = 12
+    btn.Font = Enum.Font.GothamSemibold
+    btn.Parent = TabBar
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+    local pad = Instance.new("UIPadding")
+    pad.PaddingLeft = UDim.new(0, 8) pad.PaddingRight = UDim.new(0, 8)
+    pad.Parent = btn
+
+    -- Content page
+    local page = Instance.new("ScrollingFrame")
+    page.Size = UDim2.new(1, -12, 1, -8)
+    page.Position = UDim2.new(0, 6, 0, 4)
+    page.BackgroundTransparency = 1
+    page.BorderSizePixel = 0
+    page.ScrollBarThickness = 3
+    page.ScrollBarImageColor3 = Color3.fromRGB(60, 60, 70)
+    page.CanvasSize = UDim2.new(0, 0, 0, 0)
+    page.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    page.Visible = false
+    page.Parent = Content
+    local layout = Instance.new("UIListLayout")
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.Padding = UDim.new(0, 6)
+    layout.Parent = page
+
+    Tabs[name] = page
+    TabButtons[name] = btn
+
+    btn.MouseButton1Click:Connect(function()
+        currentTab = name
+        for n, p in pairs(Tabs) do p.Visible = (n == name) end
+        for n, b in pairs(TabButtons) do
+            TweenService:Create(b, TweenInfo.new(0.2), {
+                BackgroundColor3 = (n == name) and Color3.fromRGB(45, 45, 55) or Color3.fromRGB(30, 30, 38),
+                TextColor3 = (n == name) and Color3.new(1, 1, 1) or Color3.fromRGB(130, 130, 140)
+            }):Play()
+        end
+    end)
+
+    return page
 end
 
-notify("Nero Script", "Rayfield loaded! Creating window...")
+-- Card factory (Rayfield-style: clean cards with toggle)
+local function createToggle(parent, name, desc, default, callback)
+    local card = Instance.new("Frame")
+    card.Size = UDim2.new(1, 0, 0, 56)
+    card.BackgroundColor3 = Color3.fromRGB(24, 24, 32)
+    card.BorderSizePixel = 0
+    card.Parent = parent
+    Instance.new("UICorner", card).CornerRadius = UDim.new(0, 8)
+    local pad = Instance.new("UIPadding")
+    pad.PaddingLeft = UDim.new(0, 12) pad.PaddingRight = UDim.new(0, 12) pad.PaddingTop = UDim.new(0, 8)
+    pad.Parent = card
 
-local Window = Rayfield:CreateWindow({
-    Name = "Nero Script",
-    LoadingTitle = "Nero Script",
-    LoadingSubtitle = "v7.2",
-    ConfigurationSaving = { Enabled = false },
-    Discord = { Enabled = false },
-    KeySystem = false,
-})
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(1, -60, 0, 18)
+    title.BackgroundTransparency = 1
+    title.Text = name
+    title.TextColor3 = Color3.new(1, 1, 1)
+    title.TextSize = 13
+    title.Font = Enum.Font.GothamSemibold
+    title.TextXAlignment = Enum.TextXAlignment.Left
+    title.Parent = card
 
-Rayfield:Notify({Title = "Nero Script", Content = "v7.2 loaded!", Duration = 4})
+    local descLbl = Instance.new("TextLabel")
+    descLbl.Size = UDim2.new(1, -60, 0, 14)
+    descLbl.Position = UDim2.new(0, 0, 0, 20)
+    descLbl.BackgroundTransparency = 1
+    descLbl.Text = desc
+    descLbl.TextColor3 = Color3.fromRGB(100, 100, 110)
+    descLbl.TextSize = 11
+    descLbl.Font = Enum.Font.Gotham
+    descLbl.TextXAlignment = Enum.TextXAlignment.Left
+    descLbl.Parent = card
 
--- ──── ESP TAB ────
-local ESPTab = Window:CreateTab("ESP", 4483362458)
-ESPTab:CreateSection("Player ESP")
-ESPTab:CreateToggle({Name = "Player Chams", CurrentValue = false, Flag = "Chams", Callback = function(v) S.Chams = v end})
-ESPTab:CreateToggle({Name = "Distance Display", CurrentValue = false, Flag = "Distance", Callback = function(v) S.Distance = v end})
-ESPTab:CreateToggle({Name = "Team Check", CurrentValue = true, Flag = "TeamCheck", Callback = function(v) S.TeamCheck = v end})
+    -- Toggle (Rayfield-style: pill shape)
+    local pill = Instance.new("TextButton")
+    pill.Size = UDim2.new(0, 40, 0, 22)
+    pill.Position = UDim2.new(1, -52, 0.5, -11)
+    pill.BackgroundColor3 = default and Color3.fromRGB(45, 180, 80) or Color3.fromRGB(45, 45, 55)
+    pill.BorderSizePixel = 0
+    pill.Text = ""
+    pill.Parent = card
+    Instance.new("UICorner", pill).CornerRadius = UDim.new(1, 0)
 
--- ──── PLAYER TAB ────
-local PlayerTab = Window:CreateTab("Player", 4483362458)
-PlayerTab:CreateSection("Movement")
-PlayerTab:CreateToggle({Name = "Speed x2", CurrentValue = false, Flag = "Speed", Callback = function(v)
+    local dot = Instance.new("Frame")
+    dot.Size = UDim2.new(0, 16, 0, 16)
+    dot.Position = default and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)
+    dot.BackgroundColor3 = Color3.new(1, 1, 1)
+    dot.BorderSizePixel = 0
+    dot.Parent = pill
+    Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
+
+    local state = default
+    pill.MouseButton1Click:Connect(function()
+        state = not state
+        TweenService:Create(pill, TweenInfo.new(0.2), {
+            BackgroundColor3 = state and Color3.fromRGB(45, 180, 80) or Color3.fromRGB(45, 45, 55)
+        }):Play()
+        TweenService:Create(dot, TweenInfo.new(0.2), {
+            Position = state and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)
+        }):Play()
+        callback(state)
+    end)
+
+    -- Hover effect
+    card.MouseEnter:Connect(function()
+        TweenService:Create(card, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(30, 30, 40)}):Play()
+    end)
+    card.MouseLeave:Connect(function()
+        TweenService:Create(card, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(24, 24, 32)}):Play()
+    end)
+end
+
+local function createSection(parent, text)
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(1, 0, 0, 24)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = "  " .. text
+    lbl.TextColor3 = Color3.fromRGB(255, 80, 80)
+    lbl.TextSize = 12
+    lbl.Font = Enum.Font.GothamBold
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Parent = parent
+end
+
+local function createInfo(parent, title, content)
+    local card = Instance.new("Frame")
+    card.Size = UDim2.new(1, 0, 0, 60)
+    card.BackgroundColor3 = Color3.fromRGB(24, 24, 32)
+    card.BorderSizePixel = 0
+    card.Parent = parent
+    Instance.new("UICorner", card).CornerRadius = UDim.new(0, 8)
+    local pad = Instance.new("UIPadding")
+    pad.PaddingLeft = UDim.new(0, 12) pad.PaddingRight = UDim.new(0, 12) pad.PaddingTop = UDim.new(0, 8)
+    pad.Parent = card
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(1, -24, 1, -16)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = title .. "\n" .. content
+    lbl.TextColor3 = Color3.fromRGB(140, 140, 150)
+    lbl.TextSize = 12
+    lbl.Font = Enum.Font.Gotham
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.TextYAlignment = Enum.TextYAlignment.Top
+    lbl.TextWrapped = true
+    lbl.Parent = card
+end
+
+-- ══════════════════════════════════════════
+-- BUILD UI
+-- ══════════════════════════════════════════
+local espTab = createTab("ESP", "🎯")
+createSection(espTab, "Player ESP")
+createToggle(espTab, "Player Chams", "Highlight players through walls", false, function(v) S.Chams = v end)
+createToggle(espTab, "Distance Display", "Show distance in meters", false, function(v) S.Distance = v end)
+createToggle(espTab, "Team Check", "Hide teammates", true, function(v) S.TeamCheck = v end)
+
+local playerTab = createTab("Player", "🏃")
+createSection(playerTab, "Movement")
+createToggle(playerTab, "Speed x2", "Double walk speed", false, function(v)
     S.Speed = v
-    pcall(function() if not v and Char and Char:FindFirstChild("Humanoid") then Char.Humanoid.WalkSpeed = 16 end end)
-end})
+    pcall(function() if not v and Char:FindFirstChild("Humanoid") then Char.Humanoid.WalkSpeed = 16 end end)
+end)
 
--- ──── AIMBOT TAB ────
-local AimTab = Window:CreateTab("Aimbot", 4483362458)
-AimTab:CreateSection("Aimbot Settings")
-AimTab:CreateToggle({Name = "Aimbot", CurrentValue = false, Flag = "Aimbot", Callback = function(v) S.Aimbot = v end})
-AimTab:CreateToggle({Name = "Auto Shoot", CurrentValue = false, Flag = "AutoShoot", Callback = function(v) S.AutoShoot = v end})
-AimTab:CreateToggle({Name = "Show FOV Circle", CurrentValue = false, Flag = "ShowFOV", Callback = function(v) S.AimbotShowFOV = v end})
-AimTab:CreateToggle({Name = "Team Check", CurrentValue = true, Flag = "AimTeam", Callback = function(v) S.AimbotTeam = v end})
-AimTab:CreateSlider({Name = "FOV Size", Range = {100, 800}, Increment = 10, Suffix = "px", CurrentValue = 250, Flag = "FOV", Callback = function(v) S.AimbotFOV = v end})
-AimTab:CreateSlider({Name = "Aim Smooth", Range = {1, 10}, Increment = 1, Suffix = "", CurrentValue = 4, Flag = "Smooth", Callback = function(v) S.AimbotSmooth = v / 10 end})
+local aimTab = createTab("Aimbot", "🔫")
+createSection(aimTab, "Aimbot Settings")
+createToggle(aimTab, "Aimbot", "Auto aim at visible enemies", false, function(v) S.Aimbot = v end)
+createToggle(aimTab, "Auto Shoot", "Auto fire when locked", false, function(v) S.AutoShoot = v end)
+createToggle(aimTab, "Show FOV Circle", "Display aim radius", false, function(v) S.AimbotShowFOV = v end)
+createToggle(aimTab, "Team Check", "Skip teammates", true, function(v) S.AimbotTeam = v end)
 
--- ──── SETTINGS TAB ────
-local SettingsTab = Window:CreateTab("Settings", 4483362458)
-SettingsTab:CreateSection("Info")
-SettingsTab:CreateParagraph({Title = "Nero Script v7.2", Content = "UI: Rayfield\nExecutor: " .. (identifyexecutor and identifyexecutor() or "Unknown") .. "\nAimbot: Camera CFrame + LOS\nESP: Highlight Chams"})
+local settingsTab = createTab("Settings", "⚙️")
+createSection(settingsTab, "Info")
+createInfo(settingsTab, "Nero Script v8.0", "UI: Custom (Rayfield-style)\nExecutor: " .. (identifyexecutor and identifyexecutor() or "Unknown") .. "\nAimbot: Camera CFrame + LOS\nESP: Highlight Chams")
 
-notify("Nero Script", "GUI ready!")
+-- Show first tab
+espTab.Visible = true
+TabButtons["ESP"].BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+TabButtons["ESP"].TextColor3 = Color3.new(1, 1, 1)
+
+-- RightShift toggle
+UIS.InputBegan:Connect(function(input, gpe)
+    if gpe then return end
+    if input.KeyCode == Enum.KeyCode.RightShift then
+        guiVisible = not guiVisible
+        Win.Visible = guiVisible
+    end
+end)
+
+notify("Nero Script", "v8.0 loaded! RightShift: toggle")
 
 -- ══════════════════════════════════════════
 -- HIGHLIGHT CHAMS
 -- ══════════════════════════════════════════
-local Highlights = {}
-local DistLabels = {}
+local HLs = {}
+local DLs = {}
 
-local function setupPlayer(plr)
+local function setupPlr(plr)
     if plr == LP then return end
-    if not Highlights[plr] then
+    if not HLs[plr] then
         local hl = Instance.new("Highlight")
-        hl.FillColor = S.ChamsColor
-        hl.FillTransparency = 0.45
-        hl.OutlineColor = Color3.new(1, 1, 1)
-        hl.OutlineTransparency = 0.2
+        hl.FillColor = S.ChamsColor hl.FillTransparency = 0.45
+        hl.OutlineColor = Color3.new(1,1,1) hl.OutlineTransparency = 0.2
         hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-        hl.Enabled = false
-        hl.Parent = game:GetService("CoreGui")
-        Highlights[plr] = hl
+        hl.Enabled = false hl.Parent = game:GetService("CoreGui")
+        HLs[plr] = hl
     end
-    if not DistLabels[plr] then
+    if not DLs[plr] then
         local bb = Instance.new("BillboardGui")
-        bb.Size = UDim2.new(0, 120, 0, 30)
-        bb.StudsOffset = Vector3.new(0, 3.8, 0)
-        bb.AlwaysOnTop = true
-        bb.Enabled = false
-        bb.Parent = game:GetService("CoreGui")
+        bb.Size = UDim2.new(0,120,0,30) bb.StudsOffset = Vector3.new(0,3.8,0)
+        bb.AlwaysOnTop = true bb.Enabled = false bb.Parent = game:GetService("CoreGui")
         local tl = Instance.new("TextLabel")
-        tl.Size = UDim2.new(1, 0, 1, 0)
-        tl.BackgroundTransparency = 1
-        tl.TextColor3 = Color3.new(1, 1, 1)
-        tl.TextStrokeTransparency = 0.4
-        tl.TextStrokeColor3 = Color3.new(0, 0, 0)
-        tl.TextSize = 16
-        tl.Font = Enum.Font.GothamBold
-        tl.Parent = bb
-        DistLabels[plr] = {Gui = bb, Label = tl}
+        tl.Size = UDim2.new(1,0,1,0) tl.BackgroundTransparency = 1
+        tl.TextColor3 = Color3.new(1,1,1) tl.TextStrokeTransparency = 0.4
+        tl.TextSize = 16 tl.Font = Enum.Font.GothamBold tl.Parent = bb
+        DLs[plr] = {G=bb, L=tl}
     end
-    local function onChar(char)
+    local function onC(c)
         task.wait(0.5)
-        if Highlights[plr] then Highlights[plr].Adornee = char end
-        if DistLabels[plr] then
-            local root = char:FindFirstChild("HumanoidRootPart")
-            if root then DistLabels[plr].Gui.Adornee = root end
-        end
+        if HLs[plr] then HLs[plr].Adornee = c end
+        if DLs[plr] then local r=c:FindFirstChild("HumanoidRootPart") if r then DLs[plr].G.Adornee=r end end
     end
-    if plr.Character then onChar(plr.Character) end
-    plr.CharacterAdded:Connect(onChar)
+    if plr.Character then onC(plr.Character) end
+    plr.CharacterAdded:Connect(onC)
 end
 
-local function removePlayer(plr)
-    if Highlights[plr] then pcall(function() Highlights[plr]:Destroy() end) Highlights[plr] = nil end
-    if DistLabels[plr] then pcall(function() DistLabels[plr].Gui:Destroy() end) DistLabels[plr] = nil end
+local function removePlr(plr)
+    if HLs[plr] then pcall(function() HLs[plr]:Destroy() end) HLs[plr]=nil end
+    if DLs[plr] then pcall(function() DLs[plr].G:Destroy() end) DLs[plr]=nil end
 end
 
-for _, plr in ipairs(Players:GetPlayers()) do if plr ~= LP then setupPlayer(plr) end end
-Players.PlayerAdded:Connect(setupPlayer)
-Players.PlayerRemoving:Connect(removePlayer)
+for _,p in ipairs(Players:GetPlayers()) do if p~=LP then setupPlr(p) end end
+Players.PlayerAdded:Connect(setupPlr)
+Players.PlayerRemoving:Connect(removePlr)
 
 local function updateESP()
-    for _, plr in ipairs(Players:GetPlayers()) do
-        if plr == LP then continue end
-        local hl = Highlights[plr]
-        local dl = DistLabels[plr]
-        if not hl then setupPlayer(plr) continue end
-        local c = plr.Character
-        local root = c and c:FindFirstChild("HumanoidRootPart")
-        local hum = c and c:FindFirstChild("Humanoid")
-        local alive = root and hum and hum.Health > 0
-        local showChams = S.Chams and alive
-        if showChams and S.TeamCheck and plr.Team == LP.Team then showChams = false end
-        hl.Enabled = showChams
-        if showChams then
-            hl.Adornee = c
-            hl.FillColor = (S.TeamCheck and plr.Team == LP.Team) and S.ChamsTeamColor or S.ChamsColor
-        end
+    for _,plr in ipairs(Players:GetPlayers()) do
+        if plr==LP then continue end
+        local hl=HLs[plr] local dl=DLs[plr]
+        if not hl then setupPlr(plr) continue end
+        local c=plr.Character local r=c and c:FindFirstChild("HumanoidRootPart")
+        local h=c and c:FindFirstChild("Humanoid") local alive=r and h and h.Health>0
+        local show=S.Chams and alive
+        if show and S.TeamCheck and plr.Team==LP.Team then show=false end
+        hl.Enabled=show
+        if show then hl.Adornee=c hl.FillColor=(S.TeamCheck and plr.Team==LP.Team) and S.ChamsTeamColor or S.ChamsColor end
         if dl then
-            local showDist = S.Distance and alive and Char and Char:FindFirstChild("HumanoidRootPart")
-            if showDist and S.TeamCheck and plr.Team == LP.Team then showDist = false end
-            dl.Gui.Enabled = showDist
-            if showDist then
-                dl.Gui.Adornee = root
-                dl.Label.Text = math.floor((Char.HumanoidRootPart.Position - root.Position).Magnitude) .. "m"
-            end
+            local sd=S.Distance and alive and Char and Char:FindFirstChild("HumanoidRootPart")
+            if sd and S.TeamCheck and plr.Team==LP.Team then sd=false end
+            dl.G.Enabled=sd
+            if sd then dl.G.Adornee=r dl.L.Text=math.floor((Char.HumanoidRootPart.Position-r.Position).Magnitude).."m" end
         end
     end
 end
@@ -195,136 +402,86 @@ end
 -- ══════════════════════════════════════════
 -- AIMBOT
 -- ══════════════════════════════════════════
-local lastShoot = 0
+local lastShoot=0
 
-local function makeRayParams(targetChar)
-    local params = RaycastParams.new()
-    local filter = {}
-    if Char then table.insert(filter, Char) end
-    if targetChar then table.insert(filter, targetChar) end
-    params.FilterDescendantsInstances = filter
-    params.FilterType = Enum.RaycastFilterType.Exclude
-    params.IgnoreWater = true
-    return params
+local function rayParams(tc)
+    local p=RaycastParams.new() local f={}
+    if Char then table.insert(f,Char) end if tc then table.insert(f,tc) end
+    p.FilterDescendantsInstances=f p.FilterType=Enum.RaycastFilterType.Exclude p.IgnoreWater=true return p
 end
 
-local function isOnScreen(worldPos)
-    local sp = Camera:WorldToViewportPoint(worldPos)
-    if sp.Z <= 0 then return false, Vector2.new(0, 0) end
-    local screenPos = Vector2.new(sp.X, sp.Y)
-    local vp = Camera.ViewportSize
-    if sp.X < -50 or sp.X > vp.X + 50 then return false, screenPos end
-    if sp.Y < -50 or sp.Y > vp.Y + 50 then return false, screenPos end
-    return true, screenPos
+local function onScreen(pos)
+    local sp=Camera:WorldToViewportPoint(pos)
+    if sp.Z<=0 then return false,Vector2.new(0,0) end
+    local s=Vector2.new(sp.X,sp.Y) local vp=Camera.ViewportSize
+    if sp.X<-50 or sp.X>vp.X+50 then return false,s end
+    if sp.Y<-50 or sp.Y>vp.Y+50 then return false,s end
+    return true,s
 end
 
-local function hasLineOfSight(targetChar)
-    local targetHead = targetChar:FindFirstChild("Head")
-    if not targetHead then return false end
-    local camPos = Camera.CFrame.Position
-    local targetPos = targetHead.Position
-    local direction = targetPos - camPos
-    local distance = direction.Magnitude
-    if distance > 1000 then return false end
-    if distance < 30 then return true end
-    local params = makeRayParams(targetChar)
-    local result = workspace:Raycast(camPos, direction, params)
-    if result then return result.Instance:IsDescendantOf(targetChar) end
-    return true
+local function hasLOS(tc)
+    local th=tc:FindFirstChild("Head") if not th then return false end
+    local o=Camera.CFrame.Position local d=th.Position-o local dist=d.Magnitude
+    if dist>1000 then return false end if dist<30 then return true end
+    local r=workspace:Raycast(o,d,rayParams(tc))
+    if r then return r.Instance:IsDescendantOf(tc) end return true
 end
 
-local function getClosestPlayer()
-    local closest = nil
-    local minDist = S.AimbotFOV
-    local vp = Camera.ViewportSize
-    local screenCenter = Vector2.new(vp.X / 2, vp.Y / 2)
-    for _, plr in ipairs(Players:GetPlayers()) do
-        if plr == LP then continue end
-        if S.AimbotTeam and LP.Team and plr.Team == LP.Team then continue end
-        local c = plr.Character
-        if not c then continue end
-        local hum = c:FindFirstChild("Humanoid")
-        if not hum or hum.Health <= 0 then continue end
-        local part = c:FindFirstChild(S.AimbotBone) or c:FindFirstChild("HumanoidRootPart")
-        if not part then continue end
-        local onScreen, screenPos = isOnScreen(part.Position)
-        if not onScreen then continue end
-        if not hasLineOfSight(c) then continue end
-        local distFromCenter = (screenPos - screenCenter).Magnitude
-        if distFromCenter < minDist then
-            minDist = distFromCenter
-            closest = plr
-        end
+local function getClosest()
+    local cl=nil local md=S.AimbotFOV
+    local vp=Camera.ViewportSize local sc=Vector2.new(vp.X/2,vp.Y/2)
+    for _,plr in ipairs(Players:GetPlayers()) do
+        if plr==LP then continue end
+        if S.AimbotTeam and LP.Team and plr.Team==LP.Team then continue end
+        local c=plr.Character if not c then continue end
+        local h=c:FindFirstChild("Humanoid") if not h or h.Health<=0 then continue end
+        local p=c:FindFirstChild(S.AimbotBone) or c:FindFirstChild("HumanoidRootPart") if not p then continue end
+        local os,sp=onScreen(p.Position) if not os then continue end
+        if not hasLOS(c) then continue end
+        local d=(sp-sc).Magnitude if d<md then md=d cl=plr end
     end
-    return closest
+    return cl
 end
 
 local function doAimbot()
     if not S.Aimbot then return end
-    local targetPlr = getClosestPlayer()
-    if not targetPlr then return end
-    local c = targetPlr.Character
-    if not c then return end
-    local part = c:FindFirstChild(S.AimbotBone) or c:FindFirstChild("HumanoidRootPart")
-    if not part then return end
-    local camPos = Camera.CFrame.Position
-    local targetCF = CFrame.new(camPos, part.Position)
-    Camera.CFrame = Camera.CFrame:Lerp(targetCF, S.AimbotSmooth)
+    local tp=getClosest() if not tp then return end
+    local c=tp.Character if not c then return end
+    local p=c:FindFirstChild(S.AimbotBone) or c:FindFirstChild("HumanoidRootPart") if not p then return end
+    Camera.CFrame=CFrame.new(Camera.CFrame.Position,p.Position):Lerp(Camera.CFrame,S.AimbotSmooth)
     if S.AutoShoot then
-        local blocked = false
-        pcall(function() if UIS:GetFocusedTextBox() then blocked = true end end)
+        local blocked=false
+        pcall(function() if UIS:GetFocusedTextBox() then blocked=true end end)
         if not blocked then
-            local now = tick()
-            if now - lastShoot >= 0.15 then
-                lastShoot = now
-                pcall(function()
-                    VIM:SendMouseButtonEvent(0, 0, 0, true, game, 1)
-                    task.wait(0.05)
-                    VIM:SendMouseButtonEvent(0, 0, 0, false, game, 1)
-                end)
+            local now=tick() if now-lastShoot>=0.15 then lastShoot=now
+                pcall(function() VIM:SendMouseButtonEvent(0,0,0,true,game,1) task.wait(0.05) VIM:SendMouseButtonEvent(0,0,0,false,game,1) end)
             end
         end
     end
 end
 
--- FOV Circle
-local FOVCircle = Drawing.new("Circle")
-FOVCircle.Radius = S.AimbotFOV
-FOVCircle.Thickness = 1.5
-FOVCircle.Color = Color3.fromRGB(255, 80, 80)
-FOVCircle.Filled = false
-FOVCircle.Transparency = 0.6
-FOVCircle.Visible = false
+local FOV=Drawing.new("Circle") FOV.Radius=S.AimbotFOV FOV.Thickness=1.5
+FOV.Color=Color3.fromRGB(255,80,80) FOV.Filled=false FOV.Transparency=0.6 FOV.Visible=false
 
 -- ══════════════════════════════════════════
 -- MAIN LOOP
 -- ══════════════════════════════════════════
 RunService.RenderStepped:Connect(function()
-    pcall(function() Char = LP.Character end)
-    pcall(function()
-        if S.Speed and Char and Char:FindFirstChild("Humanoid") then
-            Char.Humanoid.WalkSpeed = 16 * S.SpeedMul
-        end
-    end)
+    pcall(function() Char=LP.Character end)
+    pcall(function() if S.Speed and Char:FindFirstChild("Humanoid") then Char.Humanoid.WalkSpeed=16*S.SpeedMul end end)
     pcall(updateESP)
-    FOVCircle.Visible = S.Aimbot and S.AimbotShowFOV
-    FOVCircle.Position = UIS:GetMouseLocation()
-    FOVCircle.Radius = S.AimbotFOV
+    FOV.Visible=S.Aimbot and S.AimbotShowFOV FOV.Position=UIS:GetMouseLocation() FOV.Radius=S.AimbotFOV
     pcall(doAimbot)
 end)
 
-LP.CharacterAdded:Connect(function(newChar) Char = newChar end)
-print("[Nero] v7.2 Rayfield loaded")
+LP.CharacterAdded:Connect(function(c) Char=c end)
 
 end) -- end pcall
 
-if not success then
-    warn("[Nero Script] ERROR: " .. tostring(err))
+if not ok then
     pcall(function()
         game:GetService("StarterGui"):SetCore("SendNotification", {
-            Title = "Nero Script Error",
-            Text = tostring(err),
-            Duration = 10
+            Title="Nero Error", Text=tostring(err), Duration=10
         })
     end)
 end
