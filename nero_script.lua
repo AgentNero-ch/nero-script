@@ -1,4 +1,4 @@
--- NERO SCRIPT v8.2
+-- NERO SCRIPT v8.3
 -- Custom UI (Rayfield-style) — guaranteed to work on all executors
 
 local ok, err = pcall(function()
@@ -18,7 +18,7 @@ local function notify(t, m)
     pcall(function() StarterGui:SetCore("SendNotification", {Title=t, Text=m, Duration=5}) end)
 end
 
-notify("Nero Script", "Loading v8.2...")
+notify("Nero Script", "Loading v8.3...")
 
 while not LP.Character or not LP.Character:FindFirstChild("HumanoidRootPart") do task.wait(0.1) end
 local Char = LP.Character
@@ -351,7 +351,7 @@ createToggle(aimTab, "Team Check", "Skip teammates", true, function(v) S.AimbotT
 
 local settingsTab = createTab("Settings", "⚙️")
 createSection(settingsTab, "Info")
-createInfo(settingsTab, "Nero Script v8.2", "UI: Custom (Rayfield-style)\nExecutor: " .. (identifyexecutor and identifyexecutor() or "Unknown") .. "\nAimbot: Camera CFrame + LOS\nESP: Highlight Chams")
+createInfo(settingsTab, "Nero Script v8.3", "UI: Custom (Rayfield-style)\nExecutor: " .. (identifyexecutor and identifyexecutor() or "Unknown") .. "\nAimbot: Camera CFrame + LOS\nESP: Highlight Chams")
 
 -- Show first tab
 espTab.Visible = true
@@ -367,7 +367,7 @@ UIS.InputBegan:Connect(function(input, gpe)
     end
 end)
 
-notify("Nero Script", "v8.2 loaded! RightShift: toggle")
+notify("Nero Script", "v8.3 loaded! RightShift: toggle")
 
 -- ══════════════════════════════════════════
 -- HIGHLIGHT CHAMS
@@ -421,12 +421,12 @@ local function updateESP()
         local c=plr.Character local r=c and c:FindFirstChild("HumanoidRootPart")
         local h=c and c:FindFirstChild("Humanoid") local alive=r and h and h.Health>0
         local show=S.Chams and alive
-        if show and S.TeamCheck and plr.Team==LP.Team then show=false end
+        if show and S.TeamCheck and LP.Team and plr.Team and plr.Team==LP.Team then show=false end
         hl.Enabled=show
-        if show then hl.Adornee=c hl.FillColor=(S.TeamCheck and plr.Team==LP.Team) and S.ChamsTeamColor or S.ChamsColor end
+        if show then hl.Adornee=c hl.FillColor=(S.TeamCheck and LP.Team and plr.Team and plr.Team==LP.Team) and S.ChamsTeamColor or S.ChamsColor end
         if dl then
             local sd=S.Distance and alive and Char and Char:FindFirstChild("HumanoidRootPart")
-            if sd and S.TeamCheck and plr.Team==LP.Team then sd=false end
+            if showChams and S.TeamCheck and LP.Team and plr.Team and plr.Team == LP.Team then showChams = false end
             dl.G.Enabled=sd
             if sd then dl.G.Adornee=r dl.L.Text=math.floor((Char.HumanoidRootPart.Position-r.Position).Magnitude).."m" end
         end
@@ -466,7 +466,10 @@ local function getClosest()
     local vp=Camera.ViewportSize local sc=Vector2.new(vp.X/2,vp.Y/2)
     for _,plr in ipairs(Players:GetPlayers()) do
         if plr==LP then continue end
-        if S.AimbotTeam and LP.Team and plr.Team==LP.Team then continue end
+        if S.AimbotTeam and LP.Team and plr.Team and plr.Team == LP.Team then
+                            -- Only skip if both players have a team AND they match
+                            continue
+                        end
         local c=plr.Character if not c then continue end
         local h=c:FindFirstChild("Humanoid") if not h or h.Health<=0 then continue end
         local p=c:FindFirstChild(S.AimbotBone) or c:FindFirstChild("HumanoidRootPart") if not p then continue end
