@@ -246,16 +246,30 @@ task.spawn(function()
         local targetCF = CFrame.new(camPos, part.Position)
         Camera.CFrame = Camera.CFrame:Lerp(targetCF, S.AimbotSmooth)
 
-        -- Auto-shoot
-        if S.AutoShoot then
-            local now = tick()
-            if now - lastShoot >= 0.15 then
-                lastShoot = now
-                pcall(function()
-                    VIM:SendMouseButtonEvent(0, 0, 0, true, game, 1)
-                    task.wait(0.05)
-                    VIM:SendMouseButtonEvent(0, 0, 0, false, game, 1)
-                end)
+        -- Auto-shoot (pause when menu/GUI is open)
+        if S.AutoShoot and not guiVisible then
+            -- Also check if Roblox menu is open or textbox is focused
+            local blocked = false
+            pcall(function()
+                if UIS:GetFocusedTextBox() then blocked = true end
+            end)
+            pcall(function()
+                -- Check if escape menu is open
+                local menuOpen = game:GetService("CoreGui"):FindFirstChild("RobloxGui")
+                if menuOpen and menuOpen:FindFirstChild("SettingsShield") then
+                    if menuOpen.SettingsShield.Visible then blocked = true end
+                end
+            end)
+            if not blocked then
+                local now = tick()
+                if now - lastShoot >= 0.15 then
+                    lastShoot = now
+                    pcall(function()
+                        VIM:SendMouseButtonEvent(0, 0, 0, true, game, 1)
+                        task.wait(0.05)
+                        VIM:SendMouseButtonEvent(0, 0, 0, false, game, 1)
+                    end)
+                end
             end
         end
     end
