@@ -1,5 +1,5 @@
--- NERO SCRIPT v6.5
--- Fix: target switching, camera movement, RightShift toggle
+-- NERO SCRIPT v6.7
+-- Aimbot rewritten: proper LOS (line of sight) + on-screen check
 
 task.spawn(function()
     if not game:IsLoaded() then game.Loaded:Wait() end
@@ -18,19 +18,16 @@ task.spawn(function()
     end
     local Char = LP.Character
 
-    -- ══════════════════════════════════════════
-    -- SETTINGS
-    -- ══════════════════════════════════════════
     local S = {
         Chams = false, Distance = false, TeamCheck = true,
         ChamsColor = Color3.fromRGB(255, 50, 50),
         ChamsTeamColor = Color3.fromRGB(50, 255, 50),
         Speed = false, SpeedMul = 2,
         Aimbot = false,
-        AimbotFOV = 300,
-        AimbotSmooth = 0.3,    -- 0.1 = very slow/smooth, 1.0 = instant snap
+        AimbotFOV = 250,
+        AimbotSmooth = 0.4,
         AimbotBone = "Head",
-        AimbotTeam = true, AimbotVis = true,
+        AimbotTeam = true,
         AutoShoot = false,
         AimbotShowFOV = false,
     }
@@ -38,7 +35,7 @@ task.spawn(function()
     pcall(function()
         StarterGui:SetCore("SendNotification", {
             Title = "Nero Script",
-            Text = "v6.5 — RightShift: toggle menu",
+            Text = "v6.7 loaded — RightShift: menu",
             Duration = 5
         })
     end)
@@ -80,7 +77,7 @@ task.spawn(function()
             tl.Parent = bb
             DistLabels[plr] = {Gui = bb, Label = tl}
         end
-        local function onCharacter(char)
+        local function onChar(char)
             task.wait(0.5)
             if Highlights[plr] then Highlights[plr].Adornee = char end
             if DistLabels[plr] then
@@ -88,8 +85,8 @@ task.spawn(function()
                 if root then DistLabels[plr].Gui.Adornee = root end
             end
         end
-        if plr.Character then onCharacter(plr.Character) end
-        plr.CharacterAdded:Connect(onCharacter)
+        if plr.Character then onChar(plr.Character) end
+        plr.CharacterAdded:Connect(onChar)
     end
 
     local function removePlayer(plr)
@@ -131,54 +128,99 @@ task.spawn(function()
     end
 
     -- ══════════════════════════════════════════
-    -- AIMBOT (finds closest EVERY frame)
+    -- AIMBOT (proper FPS-style)
     -- ══════════════════════════════════════════
     local lastShoot = 0
+
+    -- Raycast filter: exclude local player character
+    local function makeRayParams()
+        local params = RaycastParams.new()
+        local filter = {}
+        if Char then table.insert(filter, Char) end
+        params.FilterDescendantsInstances = filter
+        params.FilterType = Enum.RaycastFilterType.Exclude
+        params.IgnoreWater = true
+        return params
+    end
+
+    -- Check if a world position is visible on screen (within viewport)
+    local function isOnScreen(worldPos)
+        local sp = Camera:WorldToViewportPoint(worldPos)
+        -- sp.Z > 0 means it's in front of the camera
+        if sp.Z <= 0 then return false, Vector2.new(0, 0) end
+        local screenPos = Vector2.new(sp.X, sp.Y)
+        local vp = Camera.ViewportSize
+        -- Check if within screen bounds (with small margin)
+        if sp.X < -50 or sp.X > vp.X + 50 then return false, screenPos end
+        if sp.Y < -50 or sp.Y > vp.Y + 50 then return false, screenPos end
+        return true, screenPos
+    end
+
+    -- Check line of sight: camera → target head
+    -- Returns true ONLY if nothing blocks the view to the target
+    local function hasLineOfSight(targetChar)
+        local targetHead = targetChar:FindFirstChild("Head")
+        if not targetHead then return false end
+
+        local camPos = Camera.CFrame.Position
+        local targetPos = targetHead.Position
+        local direction = targetPos - camPos
+        local distance = direction.Magnitude
+
+        if distance > 1000 then return false end -- too far
+
+        local params = makeRayParams()
+        local result = workspace:Raycast(camPos, direction, params)
+
+        if result then
+            -- Check if what we hit is part of the target character
+            local hitPart = result.Instance
+            if hitPart:IsDescendantOf(targetChar) then
+                return true -- we hit the target, clear line of sight
+            else
+                return false -- we hit a wall/obstacle
+            end
+        else
+            -- Ray didn't hit anything? Might be clear, but this is unusual
+            -- Still consider it visible since no obstacle was found
+            return true
+        end
+    end
 
     local function getClosestPlayer()
         local closest = nil
         local minDist = S.AimbotFOV
+        local vp = Camera.ViewportSize
+        local screenCenter = Vector2.new(vp.X / 2, vp.Y / 2)
 
         for _, plr in ipairs(Players:GetPlayers()) do
             if plr == LP then continue end
+
+            -- Team check
             if S.AimbotTeam and LP.Team and plr.Team == LP.Team then continue end
 
+            -- Character exists and alive
             local c = plr.Character
             if not c then continue end
             local hum = c:FindFirstChild("Humanoid")
             if not hum or hum.Health <= 0 then continue end
 
-            local part = c:FindFirstChild(S.AimbotBone) or c:FindFirstChild("HumanoidRootPart")
+            -- Get target bone
+            local part = c:FindFirstChild(S.AimbotBone)
+            if not part then part = c:FindFirstChild("HumanoidRootPart") end
             if not part then continue end
 
-            -- Visibility check: on screen + not behind wall
-            local sp, vis = Camera:WorldToViewportPoint(part.Position)
-            if not vis then continue end
+            -- Check 1: Is target on screen?
+            local onScreen, screenPos = isOnScreen(part.Position)
+            if not onScreen then continue end
 
-            if S.AimbotVis then
-                local origin = Camera.CFrame.Position
-                local direction = (part.Position - origin)
-                local params = RaycastParams.new()
-                params.FilterDescendantsInstances = {Char}
-                params.FilterType = Enum.RaycastFilterType.Exclude
-                local result = workspace:Raycast(origin, direction, params)
-                -- If ray hit something that's NOT the target player, it's behind a wall
-                if result then
-                    local hitPart = result.Instance
-                    local hitIsTarget = false
-                    -- Check if the hit part belongs to the target character
-                    local targetChar = part.Parent
-                    if targetChar and hitPart:IsDescendantOf(targetChar) then
-                        hitIsTarget = true
-                    end
-                    if not hitIsTarget then continue end
-                end
-            end
+            -- Check 2: Do we have clear line of sight? (no walls blocking)
+            if not hasLineOfSight(c) then continue end
 
-            local screenDist = (Vector2.new(sp.X, sp.Y) - UIS:GetMouseLocation()).Magnitude
-
-            if screenDist < minDist then
-                minDist = screenDist
+            -- Check 3: Distance from crosshair (FOV check)
+            local distFromCenter = (screenPos - screenCenter).Magnitude
+            if distFromCenter < minDist then
+                minDist = distFromCenter
                 closest = plr
             end
         end
@@ -197,8 +239,7 @@ task.spawn(function()
         local part = c:FindFirstChild(S.AimbotBone) or c:FindFirstChild("HumanoidRootPart")
         if not part then return end
 
-        -- Smooth aim: blend player's current look with target direction
-        -- This lets the player still move mouse while aimbot assists
+        -- Smooth aim
         local camPos = Camera.CFrame.Position
         local targetCF = CFrame.new(camPos, part.Position)
         Camera.CFrame = Camera.CFrame:Lerp(targetCF, S.AimbotSmooth)
@@ -290,7 +331,7 @@ task.spawn(function()
     SubLabel.Size = UDim2.new(0.6, 0, 0, 14)
     SubLabel.Position = UDim2.new(0, 16, 0, 28)
     SubLabel.BackgroundTransparency = 1
-    SubLabel.Text = "v6.5"
+    SubLabel.Text = "v6.7"
     SubLabel.TextColor3 = Color3.fromRGB(140, 140, 150)
     SubLabel.TextSize = 12
     SubLabel.Font = Enum.Font.Gotham
@@ -383,7 +424,6 @@ task.spawn(function()
         pad.PaddingRight = UDim.new(0, 14)
         pad.PaddingTop = UDim.new(0, 10)
         pad.Parent = card
-
         local titleLabel = Instance.new("TextLabel")
         titleLabel.Size = UDim2.new(1, -70, 0, 20)
         titleLabel.BackgroundTransparency = 1
@@ -393,7 +433,6 @@ task.spawn(function()
         titleLabel.Font = Enum.Font.GothamSemibold
         titleLabel.TextXAlignment = Enum.TextXAlignment.Left
         titleLabel.Parent = card
-
         local descLabel = Instance.new("TextLabel")
         descLabel.Size = UDim2.new(1, -70, 0, 16)
         descLabel.Position = UDim2.new(0, 0, 0, 24)
@@ -404,7 +443,6 @@ task.spawn(function()
         descLabel.Font = Enum.Font.Gotham
         descLabel.TextXAlignment = Enum.TextXAlignment.Left
         descLabel.Parent = card
-
         local toggleBg = Instance.new("TextButton")
         toggleBg.Size = UDim2.new(0, 48, 0, 26)
         toggleBg.Position = UDim2.new(1, -62, 0.5, -13)
@@ -413,7 +451,6 @@ task.spawn(function()
         toggleBg.Text = ""
         toggleBg.Parent = card
         Instance.new("UICorner", toggleBg).CornerRadius = UDim.new(1, 0)
-
         local toggleCircle = Instance.new("Frame")
         toggleCircle.Size = UDim2.new(0, 20, 0, 20)
         toggleCircle.Position = default and UDim2.new(1, -23, 0.5, -10) or UDim2.new(0, 3, 0.5, -10)
@@ -421,7 +458,6 @@ task.spawn(function()
         toggleCircle.BorderSizePixel = 0
         toggleCircle.Parent = toggleBg
         Instance.new("UICorner", toggleCircle).CornerRadius = UDim.new(1, 0)
-
         local state = default
         toggleBg.MouseButton1Click:Connect(function()
             state = not state
@@ -454,9 +490,7 @@ task.spawn(function()
         lbl.Parent = sec
     end
 
-    -- ══════════════════════════════════════════
-    -- BUILD PAGES
-    -- ══════════════════════════════════════════
+    -- PAGES
     local espPage = createPage("ESP")
     createSection(espPage, "🎯", "Player ESP")
     createCard(espPage, "Player Chams", "Highlight players through walls (3D glow)", false, function(v) S.Chams = v end)
@@ -472,10 +506,9 @@ task.spawn(function()
 
     local aimPage = createPage("Aimbot")
     createSection(aimPage, "🔫", "Aimbot Settings")
-    createCard(aimPage, "Aimbot", "Auto aim at closest player", false, function(v) S.Aimbot = v end)
+    createCard(aimPage, "Aimbot", "Auto aim at visible enemies only", false, function(v) S.Aimbot = v end)
     createCard(aimPage, "Auto Shoot", "Auto fire when locked on", false, function(v) S.AutoShoot = v end)
-    createCard(aimPage, "Show FOV Circle", "Display aim radius", false, function(v) S.AimbotShowFOV = v end)
-    createCard(aimPage, "Visibility Check", "Only target visible players", true, function(v) S.AimbotVis = v end)
+    createCard(aimPage, "Show FOV Circle", "Display aim radius around crosshair", false, function(v) S.AimbotShowFOV = v end)
     createCard(aimPage, "Team Check", "Skip teammates", true, function(v) S.AimbotTeam = v end)
 
     local settingsPage = createPage("Settings")
@@ -492,7 +525,7 @@ task.spawn(function()
     local infoLbl = Instance.new("TextLabel")
     infoLbl.Size = UDim2.new(1, -28, 1, -24)
     infoLbl.BackgroundTransparency = 1
-    infoLbl.Text = "Nero Script v6.5\nRightShift to toggle menu\nExecutor: " .. (identifyexecutor and identifyexecutor() or "Unknown")
+    infoLbl.Text = "Nero Script v6.7\nRightShift to toggle menu\nExecutor: " .. (identifyexecutor and identifyexecutor() or "Unknown")
     infoLbl.TextColor3 = Color3.fromRGB(160, 160, 170)
     infoLbl.TextSize = 14
     infoLbl.Font = Enum.Font.Gotham
@@ -509,43 +542,30 @@ task.spawn(function()
     TabButtons["ESP"].BackgroundColor3 = Color3.fromRGB(45, 45, 55)
     TabButtons["ESP"].TextColor3 = Color3.new(1, 1, 1)
 
-    -- ══════════════════════════════════════════
-    -- RIGHTSHIFT TOGGLE (AFTER guiVisible is declared)
-    -- ══════════════════════════════════════════
-    UIS.InputBegan:Connect(function(input, gameProcessed)
-        if gameProcessed then return end
+    -- RIGHTSHIFT TOGGLE
+    UIS.InputBegan:Connect(function(input, gpe)
+        if gpe then return end
         if input.KeyCode == Enum.KeyCode.RightShift then
             guiVisible = not guiVisible
             Window.Visible = guiVisible
         end
     end)
 
-    -- ══════════════════════════════════════════
     -- MAIN LOOP
-    -- ══════════════════════════════════════════
     RunService.RenderStepped:Connect(function()
         pcall(function() Char = LP.Character end)
-
-        -- Speed
         pcall(function()
             if S.Speed and Char and Char:FindFirstChild("Humanoid") then
                 Char.Humanoid.WalkSpeed = 16 * S.SpeedMul
             end
         end)
-
-        -- ESP
         pcall(updateESP)
-
-        -- FOV circle
         FOVCircle.Visible = S.Aimbot and S.AimbotShowFOV
         FOVCircle.Position = UIS:GetMouseLocation()
         FOVCircle.Radius = S.AimbotFOV
-
-        -- Aimbot (finds NEW closest target every frame)
         pcall(doAimbot)
     end)
 
     LP.CharacterAdded:Connect(function(newChar) Char = newChar end)
-
-    print("[Nero] v6.5 loaded — RightShift to toggle")
+    print("[Nero] v6.7 loaded — RightShift to toggle")
 end)
