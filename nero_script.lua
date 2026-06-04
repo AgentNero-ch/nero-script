@@ -30,7 +30,7 @@ task.spawn(function()
         AimbotFOV = 300,
         AimbotSmooth = 0.3,    -- 0.1 = very slow/smooth, 1.0 = instant snap
         AimbotBone = "Head",
-        AimbotTeam = true, AimbotVis = false,
+        AimbotTeam = true, AimbotVis = true,
         AutoShoot = false,
         AimbotShowFOV = false,
     }
@@ -151,16 +151,30 @@ task.spawn(function()
             local part = c:FindFirstChild(S.AimbotBone) or c:FindFirstChild("HumanoidRootPart")
             if not part then continue end
 
+            -- Visibility check: on screen + not behind wall
+            local sp, vis = Camera:WorldToViewportPoint(part.Position)
+            if not vis then continue end
+
             if S.AimbotVis then
                 local origin = Camera.CFrame.Position
+                local direction = (part.Position - origin)
                 local params = RaycastParams.new()
                 params.FilterDescendantsInstances = {Char}
                 params.FilterType = Enum.RaycastFilterType.Exclude
-                if workspace:Raycast(origin, part.Position - origin, params) then continue end
+                local result = workspace:Raycast(origin, direction, params)
+                -- If ray hit something that's NOT the target player, it's behind a wall
+                if result then
+                    local hitPart = result.Instance
+                    local hitIsTarget = false
+                    -- Check if the hit part belongs to the target character
+                    local targetChar = part.Parent
+                    if targetChar and hitPart:IsDescendantOf(targetChar) then
+                        hitIsTarget = true
+                    end
+                    if not hitIsTarget then continue end
+                end
             end
 
-            local sp, vis = Camera:WorldToViewportPoint(part.Position)
-            if not vis then continue end
             local screenDist = (Vector2.new(sp.X, sp.Y) - UIS:GetMouseLocation()).Magnitude
 
             if screenDist < minDist then
@@ -461,7 +475,7 @@ task.spawn(function()
     createCard(aimPage, "Aimbot", "Auto aim at closest player", false, function(v) S.Aimbot = v end)
     createCard(aimPage, "Auto Shoot", "Auto fire when locked on", false, function(v) S.AutoShoot = v end)
     createCard(aimPage, "Show FOV Circle", "Display aim radius", false, function(v) S.AimbotShowFOV = v end)
-    createCard(aimPage, "Visibility Check", "Only target visible players", false, function(v) S.AimbotVis = v end)
+    createCard(aimPage, "Visibility Check", "Only target visible players", true, function(v) S.AimbotVis = v end)
     createCard(aimPage, "Team Check", "Skip teammates", true, function(v) S.AimbotTeam = v end)
 
     local settingsPage = createPage("Settings")
