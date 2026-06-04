@@ -1,4 +1,4 @@
--- NERO SCRIPT v8.0
+-- NERO SCRIPT v8.1
 -- Custom UI (Rayfield-style) — guaranteed to work on all executors
 
 local ok, err = pcall(function()
@@ -18,7 +18,7 @@ local function notify(t, m)
     pcall(function() StarterGui:SetCore("SendNotification", {Title=t, Text=m, Duration=5}) end)
 end
 
-notify("Nero Script", "Loading v8.0...")
+notify("Nero Script", "Loading v8.1...")
 
 while not LP.Character or not LP.Character:FindFirstChild("HumanoidRootPart") do task.wait(0.1) end
 local Char = LP.Character
@@ -30,6 +30,7 @@ local S = {
     Chams=false, Distance=false, TeamCheck=true,
     ChamsColor=Color3.fromRGB(255,50,50), ChamsTeamColor=Color3.fromRGB(50,255,50),
     Speed=false, SpeedMul=2,
+    InfJump=false, Fly=false, FlySpeed=2,
     Aimbot=false, AimbotFOV=250, AimbotSmooth=0.4,
     AimbotBone="Head", AimbotTeam=true, AutoShoot=false, AimbotShowFOV=false,
 }
@@ -308,6 +309,39 @@ createToggle(playerTab, "Speed x2", "Double walk speed", false, function(v)
     pcall(function() if not v and Char:FindFirstChild("Humanoid") then Char.Humanoid.WalkSpeed = 16 end end)
 end)
 
+createToggle(playerTab, "Infinite Jump", "Jump in mid-air", false, function(v) S.InfJump = v end)
+
+createToggle(playerTab, "Fly", "Fly with WASD + Space/Shift", false, function(v)
+    S.Fly = v
+    pcall(function()
+        local hrp = Char and Char:FindFirstChild("HumanoidRootPart")
+        local hum = Char and Char:FindFirstChild("Humanoid")
+        if not v then
+            -- Disable fly: remove BodyVelocity/BodyGyro
+            if hrp then
+                for _, obj in ipairs(hrp:GetChildren()) do
+                    if obj:IsA("BodyVelocity") or obj:IsA("BodyGyro") then obj:Destroy() end
+                end
+            end
+            if hum then hum.PlatformStand = false end
+        else
+            -- Enable fly
+            if hrp and hum then
+                hum.PlatformStand = true
+                local bv = Instance.new("BodyVelocity")
+                bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+                bv.Velocity = Vector3.zero
+                bv.Parent = hrp
+                local bg = Instance.new("BodyGyro")
+                bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+                bg.D = 100
+                bg.P = 10000
+                bg.Parent = hrp
+            end
+        end
+    end)
+end)
+
 local aimTab = createTab("Aimbot", "🔫")
 createSection(aimTab, "Aimbot Settings")
 createToggle(aimTab, "Aimbot", "Auto aim at visible enemies", false, function(v) S.Aimbot = v end)
@@ -317,7 +351,7 @@ createToggle(aimTab, "Team Check", "Skip teammates", true, function(v) S.AimbotT
 
 local settingsTab = createTab("Settings", "⚙️")
 createSection(settingsTab, "Info")
-createInfo(settingsTab, "Nero Script v8.0", "UI: Custom (Rayfield-style)\nExecutor: " .. (identifyexecutor and identifyexecutor() or "Unknown") .. "\nAimbot: Camera CFrame + LOS\nESP: Highlight Chams")
+createInfo(settingsTab, "Nero Script v8.1", "UI: Custom (Rayfield-style)\nExecutor: " .. (identifyexecutor and identifyexecutor() or "Unknown") .. "\nAimbot: Camera CFrame + LOS\nESP: Highlight Chams")
 
 -- Show first tab
 espTab.Visible = true
@@ -333,7 +367,7 @@ UIS.InputBegan:Connect(function(input, gpe)
     end
 end)
 
-notify("Nero Script", "v8.0 loaded! RightShift: toggle")
+notify("Nero Script", "v8.1 loaded! RightShift: toggle")
 
 -- ══════════════════════════════════════════
 -- HIGHLIGHT CHAMS
@@ -469,6 +503,35 @@ FOV.Color=Color3.fromRGB(255,80,80) FOV.Filled=false FOV.Transparency=0.6 FOV.Vi
 RunService.RenderStepped:Connect(function()
     pcall(function() Char=LP.Character end)
     pcall(function() if S.Speed and Char:FindFirstChild("Humanoid") then Char.Humanoid.WalkSpeed=16*S.SpeedMul end end)
+    -- Infinite Jump
+    pcall(function()
+        if S.InfJump and Char:FindFirstChild("Humanoid") then
+            Char.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+        end
+    end)
+    -- Fly movement
+    pcall(function()
+        if S.Fly then
+            local hrp = Char:FindFirstChild("HumanoidRootPart")
+            local bv = hrp and hrp:FindFirstChildOfClass("BodyVelocity")
+            local bg = hrp and hrp:FindFirstChildOfClass("BodyGyro")
+            if bv and bg then
+                bg.CFrame = Camera.CFrame
+                local dir = Vector3.zero
+                if UIS:IsKeyDown(Enum.KeyCode.W) then dir = dir + Camera.CFrame.LookVector end
+                if UIS:IsKeyDown(Enum.KeyCode.S) then dir = dir - Camera.CFrame.LookVector end
+                if UIS:IsKeyDown(Enum.KeyCode.A) then dir = dir - Camera.CFrame.RightVector end
+                if UIS:IsKeyDown(Enum.KeyCode.D) then dir = dir + Camera.CFrame.RightVector end
+                if UIS:IsKeyDown(Enum.KeyCode.Space) then dir = dir + Vector3.new(0, 1, 0) end
+                if UIS:IsKeyDown(Enum.KeyCode.LeftShift) then dir = dir - Vector3.new(0, 1, 0) end
+                if dir.Magnitude > 0 then
+                    bv.Velocity = dir.Unit * (S.FlySpeed * 50)
+                else
+                    bv.Velocity = Vector3.zero
+                end
+            end
+        end
+    end)
     pcall(updateESP)
     FOV.Visible=S.Aimbot and S.AimbotShowFOV FOV.Position=UIS:GetMouseLocation() FOV.Radius=S.AimbotFOV
     pcall(doAimbot)
