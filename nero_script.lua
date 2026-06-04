@@ -1,5 +1,5 @@
--- NERO SCRIPT v6.1
--- Bigger UI + Fixed ESP highlight persistence
+-- NERO SCRIPT v6.2
+-- Fixed aimbot (Camera CFrame + auto-shoot)
 
 task.spawn(function()
     if not game:IsLoaded() then game.Loaded:Wait() end
@@ -11,6 +11,7 @@ task.spawn(function()
     local TweenService = game:GetService("TweenService")
     local Camera = workspace.CurrentCamera
     local LP = Players.LocalPlayer
+    local Mouse = LP:GetMouse()
 
     while not LP.Character or not LP.Character:FindFirstChild("HumanoidRootPart") do
         task.wait(0.1)
@@ -25,20 +26,27 @@ task.spawn(function()
         ChamsColor = Color3.fromRGB(255, 50, 50),
         ChamsTeamColor = Color3.fromRGB(50, 255, 50),
         Speed = false, SpeedMul = 2,
-        Aimbot = false, AimbotFOV = 250, AimbotSmooth = 3, AimbotBone = "Head",
-        AimbotTeam = true, AimbotVis = true,
+        -- Aimbot
+        Aimbot = false,
+        AimbotFOV = 250,
+        AimbotSmooth = 5,        -- higher = slower/smoother snap
+        AimbotBone = "Head",
+        AimbotTeam = true,
+        AimbotVis = true,
+        AimbotHold = true,       -- hold right-click to aim
+        AutoShoot = false,       -- auto click when locked
     }
 
     pcall(function()
         StarterGui:SetCore("SendNotification", {
             Title = "Nero Script",
-            Text = "v6.1 loaded — RightShift to toggle",
+            Text = "v6.2 loaded — RightShift to toggle",
             Duration = 5
         })
     end)
 
     -- ══════════════════════════════════════════
-    -- HIGHLIGHT CHAMS (persistent, survives respawn)
+    -- HIGHLIGHT CHAMS
     -- ══════════════════════════════════════════
     local Highlights = {}
     local DistLabels = {}
@@ -46,7 +54,6 @@ task.spawn(function()
     local function setupPlayer(plr)
         if plr == LP then return end
 
-        -- Create highlight
         if not Highlights[plr] then
             local hl = Instance.new("Highlight")
             hl.Name = "NeroHL"
@@ -60,7 +67,6 @@ task.spawn(function()
             Highlights[plr] = hl
         end
 
-        -- Create distance label
         if not DistLabels[plr] then
             local bb = Instance.new("BillboardGui")
             bb.Name = "NeroDist"
@@ -81,17 +87,12 @@ task.spawn(function()
             DistLabels[plr] = {Gui = bb, Label = tl}
         end
 
-        -- Update adornee when character spawns/respawns
         local function onCharacter(char)
-            task.wait(0.5) -- wait for character to fully load
-            if Highlights[plr] then
-                Highlights[plr].Adornee = char
-            end
+            task.wait(0.5)
+            if Highlights[plr] then Highlights[plr].Adornee = char end
             if DistLabels[plr] then
                 local root = char:FindFirstChild("HumanoidRootPart")
-                if root then
-                    DistLabels[plr].Gui.Adornee = root
-                end
+                if root then DistLabels[plr].Gui.Adornee = root end
             end
         end
 
@@ -100,39 +101,27 @@ task.spawn(function()
     end
 
     local function removePlayer(plr)
-        if Highlights[plr] then
-            pcall(function() Highlights[plr]:Destroy() end)
-            Highlights[plr] = nil
-        end
-        if DistLabels[plr] then
-            pcall(function() DistLabels[plr].Gui:Destroy() end)
-            DistLabels[plr] = nil
-        end
+        if Highlights[plr] then pcall(function() Highlights[plr]:Destroy() end) Highlights[plr] = nil end
+        if DistLabels[plr] then pcall(function() DistLabels[plr].Gui:Destroy() end) DistLabels[plr] = nil end
     end
 
-    -- Setup existing players
     for _, plr in ipairs(Players:GetPlayers()) do
         if plr ~= LP then setupPlayer(plr) end
     end
     Players.PlayerAdded:Connect(setupPlayer)
     Players.PlayerRemoving:Connect(removePlayer)
 
-    -- ══════════════════════════════════════════
-    -- UPDATE LOOP
-    -- ══════════════════════════════════════════
     local function updateESP()
         for _, plr in ipairs(Players:GetPlayers()) do
             if plr == LP then continue end
             local hl = Highlights[plr]
             local dl = DistLabels[plr]
             if not hl then setupPlayer(plr) continue end
-
             local c = plr.Character
             local root = c and c:FindFirstChild("HumanoidRootPart")
             local hum = c and c:FindFirstChild("Humanoid")
             local alive = root and hum and hum.Health > 0
 
-            -- Chams
             local showChams = S.Chams and alive
             if showChams and S.TeamCheck and plr.Team == LP.Team then showChams = false end
             hl.Enabled = showChams
@@ -141,22 +130,20 @@ task.spawn(function()
                 hl.FillColor = (S.TeamCheck and plr.Team == LP.Team) and S.ChamsTeamColor or S.ChamsColor
             end
 
-            -- Distance
             if dl then
                 local showDist = S.Distance and alive and Char and Char:FindFirstChild("HumanoidRootPart")
                 if showDist and S.TeamCheck and plr.Team == LP.Team then showDist = false end
                 dl.Gui.Enabled = showDist
                 if showDist then
                     dl.Gui.Adornee = root
-                    local dist = math.floor((Char.HumanoidRootPart.Position - root.Position).Magnitude)
-                    dl.Label.Text = dist .. "m"
+                    dl.Label.Text = math.floor((Char.HumanoidRootPart.Position - root.Position).Magnitude) .. "m"
                 end
             end
         end
     end
 
     -- ══════════════════════════════════════════
-    -- AIMBOT
+    -- AIMBOT (Camera CFrame + auto-shoot)
     -- ══════════════════════════════════════════
     local function isAlive(plr)
         local c = plr.Character
@@ -177,7 +164,8 @@ task.spawn(function()
             if plr == LP then continue end
             if S.AimbotTeam and plr.Team == LP.Team then continue end
             if not isAlive(plr) then continue end
-            local part = plr.Character:FindFirstChild(S.AimbotBone)
+            local c = plr.Character
+            local part = c:FindFirstChild(S.AimbotBone)
             if not part then continue end
             if S.AimbotVis and not isVisible(part) then continue end
             local sp, vis = Camera:WorldToViewportPoint(part.Position)
@@ -188,8 +176,48 @@ task.spawn(function()
         return closest
     end
 
+    local lastShoot = 0
+
+    local function aimbotTick()
+        if not S.Aimbot then return end
+
+        -- Check if should aim (hold mode = right click, toggle mode = always)
+        local shouldAim = true
+        if S.AimbotHold then
+            shouldAim = UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
+        end
+        if not shouldAim then return end
+
+        local target = getClosest()
+        if not target then return end
+
+        -- Camera CFrame aim (smooth lerp)
+        local targetPos = target.Position
+        local camPos = Camera.CFrame.Position
+        local newCF = CFrame.new(camPos, targetPos)
+        Camera.CFrame = Camera.CFrame:Lerp(newCF, 1 / S.AimbotSmooth)
+
+        -- Auto-shoot
+        if S.AutoShoot then
+            local now = tick()
+            if now - lastShoot >= 0.1 then -- fire rate limiter
+                lastShoot = now
+                pcall(function() mouse1click() end)
+            end
+        end
+    end
+
+    -- FOV Circle
+    local FOVCircle = Drawing.new("Circle")
+    FOVCircle.Radius = S.AimbotFOV
+    FOVCircle.Thickness = 1.5
+    FOVCircle.Color = Color3.fromRGB(255, 80, 80)
+    FOVCircle.Filled = false
+    FOVCircle.Transparency = 0.6
+    FOVCircle.Visible = false
+
     -- ══════════════════════════════════════════
-    -- UI (BIGGER)
+    -- UI
     -- ══════════════════════════════════════════
     local guiVisible = true
     local currentTab = "ESP"
@@ -203,7 +231,6 @@ task.spawn(function()
         pcall(function() ScreenGui.Parent = LP:WaitForChild("PlayerGui") end)
     end
 
-    -- Main Window (BIGGER: 520x400)
     local Window = Instance.new("Frame")
     Window.Size = UDim2.new(0, 520, 0, 400)
     Window.Position = UDim2.new(0.5, -260, 0.5, -200)
@@ -214,7 +241,6 @@ task.spawn(function()
     Window.Parent = ScreenGui
     Instance.new("UICorner", Window).CornerRadius = UDim.new(0, 10)
 
-    -- Drop shadow
     local Shadow = Instance.new("ImageLabel")
     Shadow.Size = UDim2.new(1, 40, 1, 40)
     Shadow.Position = UDim2.new(0, -20, 0, -20)
@@ -226,15 +252,12 @@ task.spawn(function()
     Shadow.SliceCenter = Rect.new(49, 49, 450, 450)
     Shadow.Parent = Window
 
-    -- Title Bar (taller)
     local TitleBar = Instance.new("Frame")
     TitleBar.Size = UDim2.new(1, 0, 0, 44)
     TitleBar.BackgroundColor3 = Color3.fromRGB(24, 24, 28)
     TitleBar.BorderSizePixel = 0
     TitleBar.Parent = Window
-    local tc = Instance.new("UICorner", TitleBar) tc.CornerRadius = UDim.new(0, 10)
-
-    -- Bottom cover for title bar corners
+    Instance.new("UICorner", TitleBar).CornerRadius = UDim.new(0, 10)
     local TitleCover = Instance.new("Frame")
     TitleCover.Size = UDim2.new(1, 0, 0, 10)
     TitleCover.Position = UDim2.new(0, 0, 1, -10)
@@ -257,14 +280,13 @@ task.spawn(function()
     SubLabel.Size = UDim2.new(0.6, 0, 0, 14)
     SubLabel.Position = UDim2.new(0, 16, 0, 28)
     SubLabel.BackgroundTransparency = 1
-    SubLabel.Text = "v6.1"
+    SubLabel.Text = "v6.2"
     SubLabel.TextColor3 = Color3.fromRGB(140, 140, 150)
     SubLabel.TextSize = 12
     SubLabel.Font = Enum.Font.Gotham
     SubLabel.TextXAlignment = Enum.TextXAlignment.Left
     SubLabel.Parent = TitleBar
 
-    -- Close button (bigger)
     local CloseBtn = Instance.new("TextButton")
     CloseBtn.Size = UDim2.new(0, 32, 0, 32)
     CloseBtn.Position = UDim2.new(1, -40, 0, 6)
@@ -276,11 +298,8 @@ task.spawn(function()
     CloseBtn.Font = Enum.Font.GothamBold
     CloseBtn.Parent = TitleBar
     Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 8)
-    CloseBtn.MouseButton1Click:Connect(function()
-        guiVisible = false Window.Visible = false
-    end)
+    CloseBtn.MouseButton1Click:Connect(function() guiVisible = false Window.Visible = false end)
 
-    -- Sidebar (wider)
     local Sidebar = Instance.new("Frame")
     Sidebar.Size = UDim2.new(0, 120, 1, -44)
     Sidebar.Position = UDim2.new(0, 0, 0, 44)
@@ -288,7 +307,6 @@ task.spawn(function()
     Sidebar.BorderSizePixel = 0
     Sidebar.Parent = Window
 
-    -- Content area
     local Content = Instance.new("Frame")
     Content.Size = UDim2.new(1, -120, 1, -44)
     Content.Position = UDim2.new(0, 120, 0, 44)
@@ -296,7 +314,6 @@ task.spawn(function()
     Content.BorderSizePixel = 0
     Content.Parent = Window
 
-    -- Pages
     local Pages = {}
     local TabButtons = {}
 
@@ -344,7 +361,6 @@ task.spawn(function()
         TabButtons[name] = btn
     end
 
-    -- Card factory (BIGGER)
     local function createCard(parent, title, desc, default, callback)
         local card = Instance.new("Frame")
         card.Size = UDim2.new(1, 0, 0, 62)
@@ -379,7 +395,6 @@ task.spawn(function()
         descLabel.TextXAlignment = Enum.TextXAlignment.Left
         descLabel.Parent = card
 
-        -- Toggle switch (BIGGER)
         local toggleBg = Instance.new("TextButton")
         toggleBg.Size = UDim2.new(0, 48, 0, 26)
         toggleBg.Position = UDim2.new(1, -62, 0.5, -13)
@@ -451,7 +466,9 @@ task.spawn(function()
 
     local aimPage = createPage("Aimbot")
     createSection(aimPage, "🔫", "Aimbot Settings")
-    createCard(aimPage, "Aimbot", "Lock aim to closest player", false, function(v) S.Aimbot = v end)
+    createCard(aimPage, "Aimbot", "Aim at closest player (hold RMB)", false, function(v) S.Aimbot = v end)
+    createCard(aimPage, "Auto Shoot", "Auto click when locked on target", false, function(v) S.AutoShoot = v end)
+    createCard(aimPage, "Show FOV Circle", "Display aimbot FOV radius", false, function(v) S.AimbotShowFOV = v end)
     createCard(aimPage, "Visibility Check", "Only target visible players", true, function(v) S.AimbotVis = v end)
     createCard(aimPage, "Team Check", "Skip teammates", true, function(v) S.AimbotTeam = v end)
 
@@ -469,7 +486,7 @@ task.spawn(function()
     local infoLbl = Instance.new("TextLabel")
     infoLbl.Size = UDim2.new(1, -28, 1, -24)
     infoLbl.BackgroundTransparency = 1
-    infoLbl.Text = "Nero Script v6.1\nRightShift to toggle this menu\nExecutor: " .. (identifyexecutor and identifyexecutor() or "Unknown")
+    infoLbl.Text = "Nero Script v6.2\nRightShift to toggle this menu\nExecutor: " .. (identifyexecutor and identifyexecutor() or "Unknown")
     infoLbl.TextColor3 = Color3.fromRGB(160, 160, 170)
     infoLbl.TextSize = 14
     infoLbl.Font = Enum.Font.Gotham
@@ -478,7 +495,6 @@ task.spawn(function()
     infoLbl.TextWrapped = true
     infoLbl.Parent = infoCard
 
-    -- Tabs
     createTabBtn("ESP", "🎯", 0)
     createTabBtn("Player", "🏃", 1)
     createTabBtn("Aimbot", "🔫", 2)
@@ -493,32 +509,29 @@ task.spawn(function()
     RunService.Heartbeat:Connect(function()
         pcall(function() Char = LP.Character end)
 
+        -- Speed
         pcall(function()
             if S.Speed and Char and Char:FindFirstChild("Humanoid") then
                 Char.Humanoid.WalkSpeed = 16 * S.SpeedMul
             end
         end)
 
+        -- ESP
         pcall(updateESP)
 
-        if S.Aimbot then
-            pcall(function()
-                local target = getClosest()
-                if target then
-                    local sp = Camera:WorldToViewportPoint(target.Position)
-                    local mp = UIS:GetMouseLocation()
-                    mousemoverel((sp.X - mp.X) / S.AimbotSmooth, (sp.Y - mp.Y) / S.AimbotSmooth)
-                end
-            end)
-        end
+        -- FOV circle
+        FOVCircle.Visible = S.Aimbot and S.AimbotShowFOV or false
+        FOVCircle.Position = UIS:GetMouseLocation()
+        FOVCircle.Radius = S.AimbotFOV
+
+        -- Aimbot
+        pcall(aimbotTick)
     end)
 
-    -- Character respawn
     LP.CharacterAdded:Connect(function(newChar)
         Char = newChar
     end)
 
-    -- Toggle GUI
     UIS.InputBegan:Connect(function(input, gpe)
         if gpe then return end
         if input.KeyCode == Enum.KeyCode.RightShift then
@@ -527,5 +540,5 @@ task.spawn(function()
         end
     end)
 
-    print("[Nero] v6.1 loaded — RightShift to toggle")
+    print("[Nero] v6.2 loaded — RightShift to toggle")
 end)
