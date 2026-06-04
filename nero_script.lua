@@ -1,5 +1,5 @@
--- NERO SCRIPT v6.4
--- Aimbot fix: simpler approach, keybind toggle, VirtualInputManager
+-- NERO SCRIPT v6.5
+-- Fix: target switching, camera movement, RightShift toggle
 
 task.spawn(function()
     if not game:IsLoaded() then game.Loaded:Wait() end
@@ -26,11 +26,11 @@ task.spawn(function()
         ChamsColor = Color3.fromRGB(255, 50, 50),
         ChamsTeamColor = Color3.fromRGB(50, 255, 50),
         Speed = false, SpeedMul = 2,
-        Aimbot = false, AimbotActive = false,
+        Aimbot = false,
         AimbotFOV = 300,
-        AimbotSmooth = 3,
+        AimbotSmooth = 0.3,    -- 0.1 = very slow/smooth, 1.0 = instant snap
         AimbotBone = "Head",
-        AimbotTeam = true, AimbotVis = false, -- default vis OFF for testing
+        AimbotTeam = true, AimbotVis = false,
         AutoShoot = false,
         AimbotShowFOV = false,
     }
@@ -38,7 +38,7 @@ task.spawn(function()
     pcall(function()
         StarterGui:SetCore("SendNotification", {
             Title = "Nero Script",
-            Text = "v6.4 — RightShift: menu | Q (hold): aim",
+            Text = "v6.5 — RightShift: toggle menu",
             Duration = 5
         })
     end)
@@ -131,9 +131,8 @@ task.spawn(function()
     end
 
     -- ══════════════════════════════════════════
-    -- AIMBOT (simplified, debug-friendly)
+    -- AIMBOT (finds closest EVERY frame)
     -- ══════════════════════════════════════════
-    local currentTarget = nil
     local lastShoot = 0
 
     local function getClosestPlayer()
@@ -142,34 +141,24 @@ task.spawn(function()
 
         for _, plr in ipairs(Players:GetPlayers()) do
             if plr == LP then continue end
-
-            -- team check
             if S.AimbotTeam and LP.Team and plr.Team == LP.Team then continue end
 
-            -- alive check
             local c = plr.Character
             if not c then continue end
             local hum = c:FindFirstChild("Humanoid")
             if not hum or hum.Health <= 0 then continue end
 
-            -- get target bone
-            local part = c:FindFirstChild(S.AimbotBone)
-            if not part then
-                part = c:FindFirstChild("HumanoidRootPart") -- fallback
-            end
+            local part = c:FindFirstChild(S.AimbotBone) or c:FindFirstChild("HumanoidRootPart")
             if not part then continue end
 
-            -- vis check (optional)
             if S.AimbotVis then
                 local origin = Camera.CFrame.Position
                 local params = RaycastParams.new()
                 params.FilterDescendantsInstances = {Char}
                 params.FilterType = Enum.RaycastFilterType.Exclude
-                local result = workspace:Raycast(origin, part.Position - origin, params)
-                if result then continue end
+                if workspace:Raycast(origin, part.Position - origin, params) then continue end
             end
 
-            -- screen distance
             local sp, vis = Camera:WorldToViewportPoint(part.Position)
             if not vis then continue end
             local screenDist = (Vector2.new(sp.X, sp.Y) - UIS:GetMouseLocation()).Magnitude
@@ -184,32 +173,27 @@ task.spawn(function()
     end
 
     local function doAimbot()
-        if not S.Aimbot then currentTarget = nil return end
+        if not S.Aimbot then return end
 
         local targetPlr = getClosestPlayer()
-        if not targetPlr then currentTarget = nil return end
+        if not targetPlr then return end
 
         local c = targetPlr.Character
         if not c then return end
         local part = c:FindFirstChild(S.AimbotBone) or c:FindFirstChild("HumanoidRootPart")
         if not part then return end
 
-        currentTarget = targetPlr
-
-        -- Aim using Camera CFrame
+        -- Smooth aim: blend player's current look with target direction
+        -- This lets the player still move mouse while aimbot assists
         local camPos = Camera.CFrame.Position
         local targetCF = CFrame.new(camPos, part.Position)
-
-        -- Smooth lerp (lower smooth = faster snap)
-        local alpha = math.clamp(1 / S.AimbotSmooth, 0.1, 1)
-        Camera.CFrame = Camera.CFrame:Lerp(targetCF, alpha)
+        Camera.CFrame = Camera.CFrame:Lerp(targetCF, S.AimbotSmooth)
 
         -- Auto-shoot
         if S.AutoShoot then
             local now = tick()
             if now - lastShoot >= 0.15 then
                 lastShoot = now
-                -- Try multiple methods to click
                 pcall(function()
                     VIM:SendMouseButtonEvent(0, 0, 0, true, game, 1)
                     task.wait(0.05)
@@ -229,25 +213,7 @@ task.spawn(function()
     FOVCircle.Visible = false
 
     -- ══════════════════════════════════════════
-    -- KEYBINDS (F1 = hold aim, independent of GUI)
-    -- ══════════════════════════════════════════
-    UIS.InputBegan:Connect(function(input, gpe)
-        if gpe then return end
-        if input.KeyCode == Enum.KeyCode.Q then
-        end
-        if input.KeyCode == Enum.KeyCode.RightShift then
-            guiVisible = not guiVisible
-            Window.Visible = guiVisible
-        end
-    end)
-
-    UIS.InputEnded:Connect(function(input, gpe)
-        if input.KeyCode == Enum.KeyCode.Q then
-        end
-    end)
-
-    -- ══════════════════════════════════════════
-    -- UI
+    -- GUI
     -- ══════════════════════════════════════════
     local guiVisible = true
     local currentTab = "ESP"
@@ -310,7 +276,7 @@ task.spawn(function()
     SubLabel.Size = UDim2.new(0.6, 0, 0, 14)
     SubLabel.Position = UDim2.new(0, 16, 0, 28)
     SubLabel.BackgroundTransparency = 1
-    SubLabel.Text = "v6.4"
+    SubLabel.Text = "v6.5"
     SubLabel.TextColor3 = Color3.fromRGB(140, 140, 150)
     SubLabel.TextSize = 12
     SubLabel.Font = Enum.Font.Gotham
@@ -491,8 +457,8 @@ task.spawn(function()
     end)
 
     local aimPage = createPage("Aimbot")
-    createSection(aimPage, "🔫", "Aimbot — Aimbot toggle = auto aim")
-    createCard(aimPage, "Aimbot", "Enable aimbot (hold F1 to lock)", false, function(v) S.Aimbot = v end)
+    createSection(aimPage, "🔫", "Aimbot Settings")
+    createCard(aimPage, "Aimbot", "Auto aim at closest player", false, function(v) S.Aimbot = v end)
     createCard(aimPage, "Auto Shoot", "Auto fire when locked on", false, function(v) S.AutoShoot = v end)
     createCard(aimPage, "Show FOV Circle", "Display aim radius", false, function(v) S.AimbotShowFOV = v end)
     createCard(aimPage, "Visibility Check", "Only target visible players", false, function(v) S.AimbotVis = v end)
@@ -501,7 +467,7 @@ task.spawn(function()
     local settingsPage = createPage("Settings")
     createSection(settingsPage, "⚙️", "Info")
     local infoCard = Instance.new("Frame")
-    infoCard.Size = UDim2.new(1, 0, 0, 80)
+    infoCard.Size = UDim2.new(1, 0, 0, 70)
     infoCard.BackgroundColor3 = Color3.fromRGB(28, 28, 34)
     infoCard.BorderSizePixel = 0
     infoCard.Parent = settingsPage
@@ -512,7 +478,7 @@ task.spawn(function()
     local infoLbl = Instance.new("TextLabel")
     infoLbl.Size = UDim2.new(1, -28, 1, -24)
     infoLbl.BackgroundTransparency = 1
-    infoLbl.Text = "Nero Script v6.4\nRightShift: toggle menu\nQ (hold): aim lock\nExecutor: " .. (identifyexecutor and identifyexecutor() or "Unknown")
+    infoLbl.Text = "Nero Script v6.5\nRightShift to toggle menu\nExecutor: " .. (identifyexecutor and identifyexecutor() or "Unknown")
     infoLbl.TextColor3 = Color3.fromRGB(160, 160, 170)
     infoLbl.TextSize = 14
     infoLbl.Font = Enum.Font.Gotham
@@ -530,7 +496,18 @@ task.spawn(function()
     TabButtons["ESP"].TextColor3 = Color3.new(1, 1, 1)
 
     -- ══════════════════════════════════════════
-    -- MAIN LOOP (RenderStepped for smooth aim)
+    -- RIGHTSHIFT TOGGLE (AFTER guiVisible is declared)
+    -- ══════════════════════════════════════════
+    UIS.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        if input.KeyCode == Enum.KeyCode.RightShift then
+            guiVisible = not guiVisible
+            Window.Visible = guiVisible
+        end
+    end)
+
+    -- ══════════════════════════════════════════
+    -- MAIN LOOP
     -- ══════════════════════════════════════════
     RunService.RenderStepped:Connect(function()
         pcall(function() Char = LP.Character end)
@@ -550,11 +527,11 @@ task.spawn(function()
         FOVCircle.Position = UIS:GetMouseLocation()
         FOVCircle.Radius = S.AimbotFOV
 
-        -- Aimbot
+        -- Aimbot (finds NEW closest target every frame)
         pcall(doAimbot)
     end)
 
     LP.CharacterAdded:Connect(function(newChar) Char = newChar end)
 
-    print("[Nero] v6.4 loaded — RightShift: menu | Q (hold): aim")
+    print("[Nero] v6.5 loaded — RightShift to toggle")
 end)
