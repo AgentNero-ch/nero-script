@@ -1,4 +1,4 @@
--- NERO SCRIPT v6.3.1
+-- NERO SCRIPT v6.4
 -- Aimbot fix: simpler approach, keybind toggle, VirtualInputManager
 
 task.spawn(function()
@@ -38,7 +38,7 @@ task.spawn(function()
     pcall(function()
         StarterGui:SetCore("SendNotification", {
             Title = "Nero Script",
-            Text = "v6.3.1 — RightShift: menu | Q (hold): aim",
+            Text = "v6.4 — RightShift: menu | Q (hold): aim",
             Duration = 5
         })
     end)
@@ -185,7 +185,6 @@ task.spawn(function()
 
     local function doAimbot()
         if not S.Aimbot then currentTarget = nil return end
-        if not S.AimbotActive then currentTarget = nil return end
 
         local targetPlr = getClosestPlayer()
         if not targetPlr then currentTarget = nil return end
@@ -235,7 +234,6 @@ task.spawn(function()
     UIS.InputBegan:Connect(function(input, gpe)
         if gpe then return end
         if input.KeyCode == Enum.KeyCode.Q then
-            S.AimbotActive = true
         end
         if input.KeyCode == Enum.KeyCode.RightShift then
             guiVisible = not guiVisible
@@ -245,7 +243,6 @@ task.spawn(function()
 
     UIS.InputEnded:Connect(function(input, gpe)
         if input.KeyCode == Enum.KeyCode.Q then
-            S.AimbotActive = false
         end
     end)
 
@@ -313,7 +310,7 @@ task.spawn(function()
     SubLabel.Size = UDim2.new(0.6, 0, 0, 14)
     SubLabel.Position = UDim2.new(0, 16, 0, 28)
     SubLabel.BackgroundTransparency = 1
-    SubLabel.Text = "v6.3.1"
+    SubLabel.Text = "v6.4"
     SubLabel.TextColor3 = Color3.fromRGB(140, 140, 150)
     SubLabel.TextSize = 12
     SubLabel.Font = Enum.Font.Gotham
@@ -494,7 +491,7 @@ task.spawn(function()
     end)
 
     local aimPage = createPage("Aimbot")
-    createSection(aimPage, "🔫", "Aimbot — Hold Q to aim")
+    createSection(aimPage, "🔫", "Aimbot — Aimbot toggle = auto aim")
     createCard(aimPage, "Aimbot", "Enable aimbot (hold F1 to lock)", false, function(v) S.Aimbot = v end)
     createCard(aimPage, "Auto Shoot", "Auto fire when locked on", false, function(v) S.AutoShoot = v end)
     createCard(aimPage, "Show FOV Circle", "Display aim radius", false, function(v) S.AimbotShowFOV = v end)
@@ -515,7 +512,7 @@ task.spawn(function()
     local infoLbl = Instance.new("TextLabel")
     infoLbl.Size = UDim2.new(1, -28, 1, -24)
     infoLbl.BackgroundTransparency = 1
-    infoLbl.Text = "Nero Script v6.3.1\nRightShift: toggle menu\nQ (hold): aim lock\nExecutor: " .. (identifyexecutor and identifyexecutor() or "Unknown")
+    infoLbl.Text = "Nero Script v6.4\nRightShift: toggle menu\nQ (hold): aim lock\nExecutor: " .. (identifyexecutor and identifyexecutor() or "Unknown")
     infoLbl.TextColor3 = Color3.fromRGB(160, 160, 170)
     infoLbl.TextSize = 14
     infoLbl.Font = Enum.Font.Gotham
@@ -559,5 +556,5 @@ task.spawn(function()
 
     LP.CharacterAdded:Connect(function(newChar) Char = newChar end)
 
-    print("[Nero] v6.3.1 loaded — RightShift: menu | Q (hold): aim")
+    print("[Nero] v6.4 loaded — RightShift: menu | Q (hold): aim")
 end)
