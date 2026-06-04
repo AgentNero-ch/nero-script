@@ -1,4 +1,4 @@
--- NERO SCRIPT v8.1
+-- NERO SCRIPT v8.2
 -- Custom UI (Rayfield-style) — guaranteed to work on all executors
 
 local ok, err = pcall(function()
@@ -18,7 +18,7 @@ local function notify(t, m)
     pcall(function() StarterGui:SetCore("SendNotification", {Title=t, Text=m, Duration=5}) end)
 end
 
-notify("Nero Script", "Loading v8.1...")
+notify("Nero Script", "Loading v8.2...")
 
 while not LP.Character or not LP.Character:FindFirstChild("HumanoidRootPart") do task.wait(0.1) end
 local Char = LP.Character
@@ -309,7 +309,7 @@ createToggle(playerTab, "Speed x2", "Double walk speed", false, function(v)
     pcall(function() if not v and Char:FindFirstChild("Humanoid") then Char.Humanoid.WalkSpeed = 16 end end)
 end)
 
-createToggle(playerTab, "Infinite Jump", "Jump in mid-air", false, function(v) S.InfJump = v end)
+createToggle(playerTab, "Infinite Jump", "Jump in mid-air when you press Space", false, function(v) S.InfJump = v end)
 
 createToggle(playerTab, "Fly", "Fly with WASD + Space/Shift", false, function(v)
     S.Fly = v
@@ -323,11 +323,11 @@ createToggle(playerTab, "Fly", "Fly with WASD + Space/Shift", false, function(v)
                     if obj:IsA("BodyVelocity") or obj:IsA("BodyGyro") then obj:Destroy() end
                 end
             end
-            if hum then hum.PlatformStand = false end
+            -- if hum then hum.PlatformStand = false end
         else
             -- Enable fly
             if hrp and hum then
-                hum.PlatformStand = true
+                -- hum.PlatformStand = true -- removed for natural flying
                 local bv = Instance.new("BodyVelocity")
                 bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
                 bv.Velocity = Vector3.zero
@@ -351,7 +351,7 @@ createToggle(aimTab, "Team Check", "Skip teammates", true, function(v) S.AimbotT
 
 local settingsTab = createTab("Settings", "⚙️")
 createSection(settingsTab, "Info")
-createInfo(settingsTab, "Nero Script v8.1", "UI: Custom (Rayfield-style)\nExecutor: " .. (identifyexecutor and identifyexecutor() or "Unknown") .. "\nAimbot: Camera CFrame + LOS\nESP: Highlight Chams")
+createInfo(settingsTab, "Nero Script v8.2", "UI: Custom (Rayfield-style)\nExecutor: " .. (identifyexecutor and identifyexecutor() or "Unknown") .. "\nAimbot: Camera CFrame + LOS\nESP: Highlight Chams")
 
 -- Show first tab
 espTab.Visible = true
@@ -367,7 +367,7 @@ UIS.InputBegan:Connect(function(input, gpe)
     end
 end)
 
-notify("Nero Script", "v8.1 loaded! RightShift: toggle")
+notify("Nero Script", "v8.2 loaded! RightShift: toggle")
 
 -- ══════════════════════════════════════════
 -- HIGHLIGHT CHAMS
@@ -503,12 +503,8 @@ FOV.Color=Color3.fromRGB(255,80,80) FOV.Filled=false FOV.Transparency=0.6 FOV.Vi
 RunService.RenderStepped:Connect(function()
     pcall(function() Char=LP.Character end)
     pcall(function() if S.Speed and Char:FindFirstChild("Humanoid") then Char.Humanoid.WalkSpeed=16*S.SpeedMul end end)
-    -- Infinite Jump
-    pcall(function()
-        if S.InfJump and Char:FindFirstChild("Humanoid") then
-            Char.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-        end
-    end)
+    -- Infinite Jump (only when player actually presses jump)
+    -- handled via UIS.JumpRequest below
     -- Fly movement
     pcall(function()
         if S.Fly then
@@ -524,11 +520,8 @@ RunService.RenderStepped:Connect(function()
                 if UIS:IsKeyDown(Enum.KeyCode.D) then dir = dir + Camera.CFrame.RightVector end
                 if UIS:IsKeyDown(Enum.KeyCode.Space) then dir = dir + Vector3.new(0, 1, 0) end
                 if UIS:IsKeyDown(Enum.KeyCode.LeftShift) then dir = dir - Vector3.new(0, 1, 0) end
-                if dir.Magnitude > 0 then
-                    bv.Velocity = dir.Unit * (S.FlySpeed * 50)
-                else
-                    bv.Velocity = Vector3.zero
-                end
+                local targetVel = dir.Magnitude > 0 and (dir.Unit * S.FlySpeed * 20) or Vector3.zero
+                    bv.Velocity = bv.Velocity:Lerp(targetVel, 0.15)
             end
         end
     end)
@@ -538,6 +531,13 @@ RunService.RenderStepped:Connect(function()
 end)
 
 LP.CharacterAdded:Connect(function(c) Char=c end)
+
+-- Infinite Jump: only trigger when player presses Space/taps jump
+UIS.JumpRequest:Connect(function()
+    if S.InfJump and Char and Char:FindFirstChild("Humanoid") then
+        Char.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+    end
+end)
 
 end) -- end pcall
 
