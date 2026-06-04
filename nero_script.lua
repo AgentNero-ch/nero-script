@@ -132,11 +132,12 @@ task.spawn(function()
     -- ══════════════════════════════════════════
     local lastShoot = 0
 
-    -- Raycast filter: exclude local player character
-    local function makeRayParams()
+    -- Raycast filter: exclude local player AND target character
+    local function makeRayParams(targetChar)
         local params = RaycastParams.new()
         local filter = {}
         if Char then table.insert(filter, Char) end
+        if targetChar then table.insert(filter, targetChar) end
         params.FilterDescendantsInstances = filter
         params.FilterType = Enum.RaycastFilterType.Exclude
         params.IgnoreWater = true
@@ -167,23 +168,24 @@ task.spawn(function()
         local direction = targetPos - camPos
         local distance = direction.Magnitude
 
-        if distance > 1000 then return false end -- too far
+        if distance > 1000 then return false end
 
-        local params = makeRayParams()
+        -- Close range: always visible (skip raycast, avoids self-hit issues)
+        if distance < 30 then return true end
+
+        local params = makeRayParams(targetChar)
         local result = workspace:Raycast(camPos, direction, params)
 
         if result then
-            -- Check if what we hit is part of the target character
+            -- Ray hit something — check if it's a wall or part of the target
             local hitPart = result.Instance
             if hitPart:IsDescendantOf(targetChar) then
-                return true -- we hit the target, clear line of sight
+                return true -- hit the target = clear LOS
             else
-                return false -- we hit a wall/obstacle
+                return false -- hit a wall/obstacle
             end
         else
-            -- Ray didn't hit anything? Might be clear, but this is unusual
-            -- Still consider it visible since no obstacle was found
-            return true
+            return true -- nothing hit = clear path
         end
     end
 
