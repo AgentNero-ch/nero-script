@@ -1,17 +1,37 @@
--- NERO SCRIPT v7.1
--- Rayfield UI (no task.spawn wrapper)
+-- NERO SCRIPT v7.2
+-- Error catching + fallback notification
+
+local success, err = pcall(function()
 
 if not game:IsLoaded() then game.Loaded:Wait() end
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
+local StarterGui = game:GetService("StarterGui")
 local VIM = game:GetService("VirtualInputManager")
 local Camera = workspace.CurrentCamera
 local LP = Players.LocalPlayer
 
-repeat task.wait() until LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+-- Wait for character
+local function notify(title, text)
+    pcall(function()
+        StarterGui:SetCore("SendNotification", {
+            Title = title,
+            Text = text,
+            Duration = 8
+        })
+    end)
+end
+
+notify("Nero Script", "Loading v7.2...")
+
+while not LP.Character or not LP.Character:FindFirstChild("HumanoidRootPart") do
+    task.wait(0.1)
+end
 local Char = LP.Character
+
+notify("Nero Script", "Character found, loading Rayfield...")
 
 -- ══════════════════════════════════════════
 -- SETTINGS
@@ -27,20 +47,31 @@ local S = {
 }
 
 -- ══════════════════════════════════════════
--- RAYFIELD UI
+-- LOAD RAYFIELD
 -- ══════════════════════════════════════════
-local Rayfield = loadstring(game:HttpGet('https://raw.githubusercontent.com/sirius-menu/rayfield/main/source.lua'))()
+local Rayfield
+local rayfieldSuccess, rayfieldErr = pcall(function()
+    Rayfield = loadstring(game:HttpGet('https://raw.githubusercontent.com/sirius-menu/rayfield/main/source.lua'))()
+end)
+
+if not rayfieldSuccess or not Rayfield then
+    notify("Nero Script", "Rayfield failed: " .. tostring(rayfieldErr))
+    warn("[Nero] Rayfield load failed: " .. tostring(rayfieldErr))
+    return
+end
+
+notify("Nero Script", "Rayfield loaded! Creating window...")
 
 local Window = Rayfield:CreateWindow({
     Name = "Nero Script",
     LoadingTitle = "Nero Script",
-    LoadingSubtitle = "v7.1",
+    LoadingSubtitle = "v7.2",
     ConfigurationSaving = { Enabled = false },
     Discord = { Enabled = false },
     KeySystem = false,
 })
 
-Rayfield:Notify({Title = "Nero Script", Content = "v7.1 loaded!", Duration = 4})
+Rayfield:Notify({Title = "Nero Script", Content = "v7.2 loaded!", Duration = 4})
 
 -- ──── ESP TAB ────
 local ESPTab = Window:CreateTab("ESP", 4483362458)
@@ -70,7 +101,9 @@ AimTab:CreateSlider({Name = "Aim Smooth", Range = {1, 10}, Increment = 1, Suffix
 -- ──── SETTINGS TAB ────
 local SettingsTab = Window:CreateTab("Settings", 4483362458)
 SettingsTab:CreateSection("Info")
-SettingsTab:CreateParagraph({Title = "Nero Script v7.1", Content = "UI: Rayfield\nExecutor: " .. (identifyexecutor and identifyexecutor() or "Unknown") .. "\nAimbot: Camera CFrame + LOS\nESP: Highlight Chams"})
+SettingsTab:CreateParagraph({Title = "Nero Script v7.2", Content = "UI: Rayfield\nExecutor: " .. (identifyexecutor and identifyexecutor() or "Unknown") .. "\nAimbot: Camera CFrame + LOS\nESP: Highlight Chams"})
+
+notify("Nero Script", "GUI ready!")
 
 -- ══════════════════════════════════════════
 -- HIGHLIGHT CHAMS
@@ -281,4 +314,17 @@ RunService.RenderStepped:Connect(function()
 end)
 
 LP.CharacterAdded:Connect(function(newChar) Char = newChar end)
-print("[Nero] v7.1 Rayfield loaded")
+print("[Nero] v7.2 Rayfield loaded")
+
+end) -- end pcall
+
+if not success then
+    warn("[Nero Script] ERROR: " .. tostring(err))
+    pcall(function()
+        game:GetService("StarterGui"):SetCore("SendNotification", {
+            Title = "Nero Script Error",
+            Text = tostring(err),
+            Duration = 10
+        })
+    end)
+end
