@@ -1,6 +1,6 @@
--- NERO SCRIPT v2.2 - TEST VERSION
--- Execute langsung, gak perlu console
--- Kalau berhasil, muncul notifikasi di layar
+-- NERO SCRIPT v3.0
+-- Powered by Fluent UI Library
+-- Compatible: Ronix, Delta, Synapse, KRNL, Fluxus, dll
 
 -- ══════════════════════════════════════════
 -- ANTI-DETECT
@@ -17,6 +17,13 @@ pcall(function()
         end)
     end
 end)
+
+-- ══════════════════════════════════════════
+-- LOAD FLUENT UI
+-- ══════════════════════════════════════════
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
+local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
 
 -- ══════════════════════════════════════════
 -- SERVICES
@@ -40,22 +47,6 @@ local S = {
 }
 
 -- ══════════════════════════════════════════
--- NOTIFICATION FUNCTION
--- ══════════════════════════════════════════
-local function Notify(title, text, duration)
-    pcall(function()
-        game:GetService("StarterGui"):SetCore("SendNotification", {
-            Title = title,
-            Text = text,
-            Duration = duration or 3
-        })
-    end)
-end
-
--- Test notification
-Notify("NERO SCRIPT", "Loading v2.2...", 2)
-
--- ══════════════════════════════════════════
 -- CHECK CAPABILITIES
 -- ══════════════════════════════════════════
 local hasDrawing = false
@@ -65,7 +56,179 @@ local hasMouse = false
 pcall(function() if mousemoverel then hasMouse = true end end)
 
 -- ══════════════════════════════════════════
--- ESP OBJECTS
+-- CREATE WINDOW
+-- ══════════════════════════════════════════
+local Window = Fluent:CreateWindow({
+    Title = "NERO SCRIPT v3.0",
+    SubTitle = "by Nero",
+    TabWidth = 160,
+    Size = UDim2.fromOffset(580, 460),
+    Acrylic = false,
+    Theme = "Darker",
+    MinimizeKey = Enum.KeyCode.RightShift
+})
+
+-- Tabs
+local Tabs = {
+    ESP = Window:AddTab({ Title = "ESP", Icon = "eye" }),
+    Player = Window:AddTab({ Title = "Player", Icon = "user" }),
+    Aimbot = Window:AddTab({ Title = "Aimbot", Icon = "crosshair" }),
+    Settings = Window:AddTab({ Title = "Settings", Icon = "settings" }),
+}
+
+local Options = Fluent.Options
+
+-- ══════════════════════════════════════════
+-- ESP TAB
+-- ══════════════════════════════════════════
+Tabs.ESP:AddSection("ESP Settings")
+
+Tabs.ESP:AddToggle("ESP_Master", {
+    Title = "ESP Master",
+    Default = false,
+    Callback = function(v) S.ESP = v end
+})
+
+Tabs.ESP:AddToggle("ESP_Box", {
+    Title = "Box",
+    Default = true,
+    Callback = function(v) S.ESP_Box = v end
+})
+
+Tabs.ESP:AddToggle("ESP_Name", {
+    Title = "Name",
+    Default = true,
+    Callback = function(v) S.ESP_Name = v end
+})
+
+Tabs.ESP:AddToggle("ESP_HP", {
+    Title = "Health Bar",
+    Default = true,
+    Callback = function(v) S.ESP_Health = v end
+})
+
+Tabs.ESP:AddToggle("ESP_Dist", {
+    Title = "Distance",
+    Default = true,
+    Callback = function(v) S.ESP_Distance = v end
+})
+
+Tabs.ESP:AddToggle("ESP_Team", {
+    Title = "Team Check",
+    Default = true,
+    Callback = function(v) S.ESP_TeamCheck = v end
+})
+
+-- ══════════════════════════════════════════
+-- PLAYER TAB
+-- ══════════════════════════════════════════
+Tabs.Player:AddSection("Player Settings")
+
+Tabs.Player:AddToggle("Speed", {
+    Title = "Speed Hack",
+    Default = false,
+    Callback = function(v) S.Speed = v end
+})
+
+Tabs.Player:AddSlider("SpeedMul", {
+    Title = "Speed Multiplier",
+    Description = "WalkSpeed multiplier (16 base)",
+    Default = 2,
+    Min = 1,
+    Max = 10,
+    Rounding = 0,
+    Callback = function(v) S.SpeedMul = v end
+})
+
+-- ══════════════════════════════════════════
+-- AIMBOT TAB
+-- ══════════════════════════════════════════
+Tabs.Aimbot:AddSection("Aimbot Settings")
+
+Tabs.Aimbot:AddToggle("Aimbot", {
+    Title = "Aimbot Master",
+    Default = false,
+    Callback = function(v) S.Aimbot = v end
+})
+
+Tabs.Aimbot:AddToggle("Aimbot_Team", {
+    Title = "Team Check",
+    Default = true,
+    Callback = function(v) S.AimbotTeam = v end
+})
+
+Tabs.Aimbot:AddToggle("Aimbot_Vis", {
+    Title = "Visibility Check",
+    Default = true,
+    Callback = function(v) S.AimbotVis = v end
+})
+
+Tabs.Aimbot:AddToggle("Aimbot_FOV_Show", {
+    Title = "Show FOV Circle",
+    Default = true,
+    Callback = function(v) S.AimbotShowFOV = v end
+})
+
+Tabs.Aimbot:AddSlider("Aimbot_FOV", {
+    Title = "FOV Radius",
+    Description = "Aimbot detection radius",
+    Default = 250,
+    Min = 50,
+    Max = 800,
+    Rounding = 0,
+    Callback = function(v) S.AimbotFOV = v end
+})
+
+Tabs.Aimbot:AddSlider("Aimbot_Smooth", {
+    Title = "Smoothness",
+    Description = "Lower = faster lock",
+    Default = 3,
+    Min = 1,
+    Max = 10,
+    Rounding = 0,
+    Callback = function(v) S.AimbotSmooth = v end
+})
+
+Tabs.Aimbot:AddDropdown("Aimbot_Bone", {
+    Title = "Aim Bone",
+    Values = {"Head", "HumanoidRootPart", "UpperTorso", "LowerTorso"},
+    Default = "Head",
+    Callback = function(v) S.AimbotBone = v end
+})
+
+-- ══════════════════════════════════════════
+-- SETTINGS TAB
+-- ══════════════════════════════════════════
+Tabs.Settings:AddSection("Info")
+Tabs.Settings:AddParagraph({
+    Title = "NERO SCRIPT v3.0",
+    Content = "Executor: " .. (getexecutorname and getexecutorname() or "Unknown") .. "\nDrawing API: " .. (hasDrawing and "Supported" or "Not Supported") .. "\nmousemoverel: " .. (hasMouse and "Supported" or "Not Supported")
+})
+
+Tabs.Settings:AddParagraph({
+    Title = "Keybinds",
+    Content = "RightShift = Minimize/Show Panel\nRMB (Hold) = Aimbot Lock"
+})
+
+SaveManager:SetLibrary(Fluent)
+InterfaceManager:SetLibrary(Fluent)
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({})
+InterfaceManager:SetFolder("NeroScript")
+SaveManager:SetFolder("NeroScript/saves")
+InterfaceManager:BuildInterfaceSection(Tabs.Settings)
+SaveManager:BuildConfigSection(Tabs.Settings)
+
+Window:SelectTab(1)
+
+Fluent:Notify({
+    Title = "Nero Script",
+    Content = "Loaded successfully! RightShift = Toggle",
+    Duration = 5
+})
+
+-- ══════════════════════════════════════════
+-- ESP SYSTEM
 -- ══════════════════════════════════════════
 ESP_Objects = {}
 
@@ -231,272 +394,7 @@ local function aimAt(target)
 end
 
 -- ══════════════════════════════════════════
--- GUI (LAST)
--- ══════════════════════════════════════════
-local Gui
-pcall(function()
-    local parent = game:GetService("CoreGui")
-    pcall(function() if protect_gui then protect_gui(Gui) end end)
-    
-    Gui = Instance.new("ScreenGui")
-    Gui.Name = "NeroPanel"
-    Gui.ResetOnSpawn = false
-    Gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    Gui.Parent = parent
-    
-    local Main = Instance.new("Frame")
-    Main.Name = "Main"
-    Main.Size = UDim2.new(0, 260, 0, 400)
-    Main.Position = UDim2.new(0, 20, 0.2, 0)
-    Main.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-    Main.BorderSizePixel = 0
-    Main.Active = true
-    Main.Draggable = true
-    Main.Parent = Gui
-    Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 10)
-    
-    -- Header
-    local Header = Instance.new("Frame")
-    Header.Size = UDim2.new(1, 0, 0, 38)
-    Header.BackgroundColor3 = Color3.fromRGB(200, 40, 40)
-    Header.BorderSizePixel = 0
-    Header.Parent = Main
-    Instance.new("UICorner", Header).CornerRadius = UDim.new(0, 10)
-    
-    local Title = Instance.new("TextLabel")
-    Title.Size = UDim2.new(1, -50, 1, 0)
-    Title.Position = UDim2.new(0, 10, 0, 0)
-    Title.BackgroundTransparency = 1
-    Title.Text = "NERO SCRIPT v2.2"
-    Title.TextColor3 = Color3.new(1, 1, 1)
-    Title.TextSize = 15
-    Title.Font = Enum.Font.GothamBold
-    Title.TextXAlignment = Enum.TextXAlignment.Left
-    Title.Parent = Header
-    
-    local CloseBtn = Instance.new("TextButton")
-    CloseBtn.Size = UDim2.new(0, 26, 0, 26)
-    CloseBtn.Position = UDim2.new(1, -32, 0, 6)
-    CloseBtn.BackgroundColor3 = Color3.fromRGB(160, 20, 20)
-    CloseBtn.Text = "X"
-    CloseBtn.TextColor3 = Color3.new(1, 1, 1)
-    CloseBtn.TextSize = 14
-    CloseBtn.Font = Enum.Font.GothamBold
-    CloseBtn.Parent = Header
-    Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(1, 0)
-    
-    -- Content
-    local Content = Instance.new("ScrollingFrame")
-    Content.Size = UDim2.new(1, -12, 1, -46)
-    Content.Position = UDim2.new(0, 6, 0, 42)
-    Content.BackgroundTransparency = 1
-    Content.BorderSizePixel = 0
-    Content.ScrollBarThickness = 4
-    Content.ScrollBarImageColor3 = Color3.fromRGB(200, 50, 50)
-    Content.CanvasSize = UDim2.new(0, 0, 0, 0)
-    Content.AutomaticCanvasSize = Enum.AutomaticSize.Y
-    Content.Parent = Main
-    
-    local Layout = Instance.new("UIListLayout")
-    Layout.Padding = UDim.new(0, 4)
-    Layout.SortOrder = Enum.SortOrder.LayoutOrder
-    Layout.Parent = Content
-    
-    -- Widget helpers
-    local order = 0
-    
-    local function Section(text)
-        order = order + 1
-        local f = Instance.new("Frame")
-        f.Size = UDim2.new(1, 0, 0, 26)
-        f.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
-        f.BorderSizePixel = 0
-        f.LayoutOrder = order
-        f.Parent = Content
-        Instance.new("UICorner", f).CornerRadius = UDim.new(0, 6)
-        local l = Instance.new("TextLabel")
-        l.Size = UDim2.new(1, -8, 1, 0)
-        l.Position = UDim2.new(0, 8, 0, 0)
-        l.BackgroundTransparency = 1
-        l.Text = text
-        l.TextColor3 = Color3.fromRGB(200, 50, 50)
-        l.TextSize = 13
-        l.Font = Enum.Font.GothamBold
-        l.TextXAlignment = Enum.TextXAlignment.Left
-        l.Parent = f
-    end
-    
-    local function Toggle(text, default, callback)
-        order = order + 1
-        local state = default
-        local f = Instance.new("TextButton")
-        f.Size = UDim2.new(1, 0, 0, 32)
-        f.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
-        f.BorderSizePixel = 0
-        f.Text = ""
-        f.LayoutOrder = order
-        f.Parent = Content
-        Instance.new("UICorner", f).CornerRadius = UDim.new(0, 6)
-        
-        local label = Instance.new("TextLabel")
-        label.Size = UDim2.new(1, -55, 1, 0)
-        label.Position = UDim2.new(0, 10, 0, 0)
-        label.BackgroundTransparency = 1
-        label.Text = text
-        label.TextColor3 = Color3.fromRGB(230, 230, 230)
-        label.TextSize = 12
-        label.Font = Enum.Font.GothamSemibold
-        label.TextXAlignment = Enum.TextXAlignment.Left
-        label.Parent = f
-        
-        local pill = Instance.new("Frame")
-        pill.Size = UDim2.new(0, 36, 0, 18)
-        pill.Position = UDim2.new(1, -44, 0.5, -9)
-        pill.BackgroundColor3 = state and Color3.fromRGB(50, 180, 80) or Color3.fromRGB(50, 50, 55)
-        pill.BorderSizePixel = 0
-        pill.Parent = f
-        Instance.new("UICorner", pill).CornerRadius = UDim.new(1, 0)
-        
-        local dot = Instance.new("Frame")
-        dot.Size = UDim2.new(0, 14, 0, 14)
-        dot.Position = state and UDim2.new(1, -16, 0.5, -7) or UDim2.new(0, 2, 0.5, -7)
-        dot.BackgroundColor3 = Color3.new(1, 1, 1)
-        dot.BorderSizePixel = 0
-        dot.Parent = pill
-        Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
-        
-        f.MouseButton1Click:Connect(function()
-            state = not state
-            pill.BackgroundColor3 = state and Color3.fromRGB(50, 180, 80) or Color3.fromRGB(50, 50, 55)
-            dot.Position = state and UDim2.new(1, -16, 0.5, -7) or UDim2.new(0, 2, 0.5, -7)
-            pcall(function() callback(state) end)
-        end)
-    end
-    
-    local function Slider(text, min, max, default, callback)
-        order = order + 1
-        local value = default
-        local f = Instance.new("Frame")
-        f.Size = UDim2.new(1, 0, 0, 46)
-        f.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
-        f.BorderSizePixel = 0
-        f.LayoutOrder = order
-        f.Parent = Content
-        Instance.new("UICorner", f).CornerRadius = UDim.new(0, 6)
-        
-        local label = Instance.new("TextLabel")
-        label.Size = UDim2.new(0.65, 0, 0, 20)
-        label.Position = UDim2.new(0, 10, 0, 2)
-        label.BackgroundTransparency = 1
-        label.Text = text
-        label.TextColor3 = Color3.fromRGB(230, 230, 230)
-        label.TextSize = 12
-        label.Font = Enum.Font.GothamSemibold
-        label.TextXAlignment = Enum.TextXAlignment.Left
-        label.Parent = f
-        
-        local valLabel = Instance.new("TextLabel")
-        valLabel.Size = UDim2.new(0.35, -10, 0, 20)
-        valLabel.Position = UDim2.new(0.65, 0, 0, 2)
-        valLabel.BackgroundTransparency = 1
-        valLabel.Text = tostring(value)
-        valLabel.TextColor3 = Color3.fromRGB(200, 50, 50)
-        valLabel.TextSize = 13
-        valLabel.Font = Enum.Font.GothamBold
-        valLabel.TextXAlignment = Enum.TextXAlignment.Right
-        valLabel.Parent = f
-        
-        local barBg = Instance.new("Frame")
-        barBg.Size = UDim2.new(1, -20, 0, 8)
-        barBg.Position = UDim2.new(0, 10, 0, 30)
-        barBg.BackgroundColor3 = Color3.fromRGB(50, 50, 55)
-        barBg.BorderSizePixel = 0
-        barBg.Parent = f
-        Instance.new("UICorner", barBg).CornerRadius = UDim.new(1, 0)
-        
-        local pct = (value - min) / (max - min)
-        local barFill = Instance.new("Frame")
-        barFill.Size = UDim2.new(pct, 0, 1, 0)
-        barFill.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-        barFill.BorderSizePixel = 0
-        barFill.Parent = barBg
-        Instance.new("UICorner", barFill).CornerRadius = UDim.new(1, 0)
-        
-        local knob = Instance.new("Frame")
-        knob.Size = UDim2.new(0, 14, 0, 14)
-        knob.Position = UDim2.new(pct, -7, 0.5, -7)
-        knob.BackgroundColor3 = Color3.new(1, 1, 1)
-        knob.BorderSizePixel = 0
-        knob.ZIndex = 2
-        knob.Parent = barBg
-        Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
-        
-        local dragging = false
-        barBg.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = true end
-        end)
-        UIS.InputEnded:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
-        end)
-        UIS.InputChanged:Connect(function(input)
-            if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-                local newPct = math.clamp((input.Position.X - barBg.AbsolutePosition.X) / barBg.AbsoluteSize.X, 0, 1)
-                value = math.floor(min + (max - min) * newPct)
-                barFill.Size = UDim2.new(newPct, 0, 1, 0)
-                knob.Position = UDim2.new(newPct, -7, 0.5, -7)
-                valLabel.Text = tostring(value)
-                pcall(function() callback(value) end)
-            end
-        end)
-    end
-    
-    -- BUILD PANEL
-    Section("ESP")
-    Toggle("ESP Master", false, function(v) S.ESP = v end)
-    Toggle("Box", true, function(v) S.ESP_Box = v end)
-    Toggle("Name", true, function(v) S.ESP_Name = v end)
-    Toggle("Health Bar", true, function(v) S.ESP_Health = v end)
-    Toggle("Distance", true, function(v) S.ESP_Distance = v end)
-    Toggle("Team Check", true, function(v) S.ESP_TeamCheck = v end)
-    
-    Section("SPEED")
-    Toggle("Speed Hack", false, function(v) S.Speed = v end)
-    Slider("Multiplier", 1, 10, 2, function(v) S.SpeedMul = v end)
-    
-    Section("AIMBOT")
-    Toggle("Aimbot Master", false, function(v) S.Aimbot = v end)
-    Toggle("Team Check", true, function(v) S.AimbotTeam = v end)
-    Toggle("Visibility Check", true, function(v) S.AimbotVis = v end)
-    Toggle("Show FOV Circle", true, function(v) S.AimbotShowFOV = v end)
-    Slider("FOV Radius", 50, 800, 250, function(v) S.AimbotFOV = v end)
-    Slider("Smoothness", 1, 10, 3, function(v) S.AimbotSmooth = v end)
-    
-    local info = Instance.new("TextLabel")
-    info.Size = UDim2.new(1, 0, 0, 30)
-    info.BackgroundTransparency = 1
-    info.Text = "RMB = Aimbot | RightShift = Hide"
-    info.TextColor3 = Color3.fromRGB(120, 120, 125)
-    info.TextSize = 10
-    info.Font = Enum.Font.Gotham
-    info.LayoutOrder = 999
-    info.Parent = Content
-    
-    -- Close
-    CloseBtn.MouseButton1Click:Connect(function()
-        Gui:Destroy()
-        for _, esp in pairs(ESP_Objects) do
-            pcall(function()
-                if esp.UseDrawing then
-                    for _, obj in pairs(esp) do if type(obj) ~= "boolean" then pcall(function() obj:Remove() end) end end
-                else esp.Billboard:Destroy() end
-            end)
-        end
-        if FOVCircle then pcall(function() FOVCircle:Remove() end) end
-    end)
-end)
-
--- ══════════════════════════════════════════
--- LOOPS
+-- MAIN LOOPS
 -- ══════════════════════════════════════════
 RunService.RenderStepped:Connect(updateESP)
 RunService.Heartbeat:Connect(updateSpeed)
@@ -517,11 +415,6 @@ end)
 UIS.InputBegan:Connect(function(input, gpe)
     if gpe then return end
     if input.UserInputType == S.AimbotKey then S.AimbotHeld = true end
-    if input.KeyCode == Enum.KeyCode.RightShift then
-        if Gui and Gui:FindFirstChild("Main") then
-            Gui.Main.Visible = not Gui.Main.Visible
-        end
-    end
 end)
 
 UIS.InputEnded:Connect(function(input)
@@ -533,7 +426,3 @@ for _, p in pairs(Players:GetPlayers()) do createESP(p) end
 Players.PlayerAdded:Connect(function(p) createESP(p) end)
 Players.PlayerRemoving:Connect(function(p) removeESP(p) end)
 LP.CharacterAdded:Connect(function() task.wait(1) updateSpeed() end)
-
--- Success notification
-task.wait(1)
-Notify("NERO SCRIPT v2.2", "Loaded! RightShift = Toggle Panel", 5)
