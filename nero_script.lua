@@ -1,9 +1,9 @@
--- NERO SCRIPT v3.0
--- Powered by Fluent UI Library
+-- NERO SCRIPT v4.0
+-- Lightweight GUI — no external libraries
 -- Compatible: Ronix, Delta, Synapse, KRNL, Fluxus, dll
 
 -- ══════════════════════════════════════════
--- ANTI-DETECT
+-- SAFE ANTI-DETECT (wrapped in pcall)
 -- ══════════════════════════════════════════
 pcall(function()
     if hookmetamethod then
@@ -11,19 +11,14 @@ pcall(function()
             local method = getnamecallmethod()
             if method == "FireServer" or method == "InvokeServer" then
                 local name = self.Name:lower()
-                if name:find("anticheat") or name:find("detect") or name:find("log") then return nil end
+                if name:find("anticheat") or name:find("detect") or name:find("log") then
+                    return nil
+                end
             end
             return old(self, ...)
         end)
     end
 end)
-
--- ══════════════════════════════════════════
--- LOAD FLUENT UI
--- ══════════════════════════════════════════
-local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
-local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
-local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
 
 -- ══════════════════════════════════════════
 -- SERVICES
@@ -33,6 +28,11 @@ local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
 local Camera = workspace.CurrentCamera
 local LP = Players.LocalPlayer
+
+-- wait for character
+repeat task.wait() until LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+local Char = LP.Character
+local Humanoid = Char:WaitForChild("Humanoid")
 
 -- ══════════════════════════════════════════
 -- SETTINGS
@@ -47,382 +47,376 @@ local S = {
 }
 
 -- ══════════════════════════════════════════
--- CHECK CAPABILITIES
+-- NOTIFICATION (before GUI)
 -- ══════════════════════════════════════════
-local hasDrawing = false
-pcall(function() if Drawing and Drawing.new then hasDrawing = true end end)
-
-local hasMouse = false
-pcall(function() if mousemoverel then hasMouse = true end end)
-
--- ══════════════════════════════════════════
--- CREATE WINDOW
--- ══════════════════════════════════════════
-local Window = Fluent:CreateWindow({
-    Title = "NERO SCRIPT v3.0",
-    SubTitle = "by Nero",
-    TabWidth = 160,
-    Size = UDim2.fromOffset(580, 460),
-    Acrylic = false,
-    Theme = "Darker",
-    MinimizeKey = Enum.KeyCode.RightShift
-})
-
--- Tabs
-local Tabs = {
-    ESP = Window:AddTab({ Title = "ESP", Icon = "eye" }),
-    Player = Window:AddTab({ Title = "Player", Icon = "user" }),
-    Aimbot = Window:AddTab({ Title = "Aimbot", Icon = "crosshair" }),
-    Settings = Window:AddTab({ Title = "Settings", Icon = "settings" }),
-}
-
-local Options = Fluent.Options
+pcall(function()
+    game:GetService("StarterGui"):SetCore("SendNotification", {
+        Title = "⚡ Nero Script v4.0",
+        Text = "Loaded! Press RightShift to toggle GUI",
+        Duration = 5
+    })
+end)
 
 -- ══════════════════════════════════════════
--- ESP TAB
+-- ESP DRAWINGS
 -- ══════════════════════════════════════════
-Tabs.ESP:AddSection("ESP Settings")
+local ESPObjects = {}
 
-Tabs.ESP:AddToggle("ESP_Master", {
-    Title = "ESP Master",
-    Default = false,
-    Callback = function(v) S.ESP = v end
-})
-
-Tabs.ESP:AddToggle("ESP_Box", {
-    Title = "Box",
-    Default = true,
-    Callback = function(v) S.ESP_Box = v end
-})
-
-Tabs.ESP:AddToggle("ESP_Name", {
-    Title = "Name",
-    Default = true,
-    Callback = function(v) S.ESP_Name = v end
-})
-
-Tabs.ESP:AddToggle("ESP_HP", {
-    Title = "Health Bar",
-    Default = true,
-    Callback = function(v) S.ESP_Health = v end
-})
-
-Tabs.ESP:AddToggle("ESP_Dist", {
-    Title = "Distance",
-    Default = true,
-    Callback = function(v) S.ESP_Distance = v end
-})
-
-Tabs.ESP:AddToggle("ESP_Team", {
-    Title = "Team Check",
-    Default = true,
-    Callback = function(v) S.ESP_TeamCheck = v end
-})
-
--- ══════════════════════════════════════════
--- PLAYER TAB
--- ══════════════════════════════════════════
-Tabs.Player:AddSection("Player Settings")
-
-Tabs.Player:AddToggle("Speed", {
-    Title = "Speed Hack",
-    Default = false,
-    Callback = function(v) S.Speed = v end
-})
-
-Tabs.Player:AddSlider("SpeedMul", {
-    Title = "Speed Multiplier",
-    Description = "WalkSpeed multiplier (16 base)",
-    Default = 2,
-    Min = 1,
-    Max = 10,
-    Rounding = 0,
-    Callback = function(v) S.SpeedMul = v end
-})
-
--- ══════════════════════════════════════════
--- AIMBOT TAB
--- ══════════════════════════════════════════
-Tabs.Aimbot:AddSection("Aimbot Settings")
-
-Tabs.Aimbot:AddToggle("Aimbot", {
-    Title = "Aimbot Master",
-    Default = false,
-    Callback = function(v) S.Aimbot = v end
-})
-
-Tabs.Aimbot:AddToggle("Aimbot_Team", {
-    Title = "Team Check",
-    Default = true,
-    Callback = function(v) S.AimbotTeam = v end
-})
-
-Tabs.Aimbot:AddToggle("Aimbot_Vis", {
-    Title = "Visibility Check",
-    Default = true,
-    Callback = function(v) S.AimbotVis = v end
-})
-
-Tabs.Aimbot:AddToggle("Aimbot_FOV_Show", {
-    Title = "Show FOV Circle",
-    Default = true,
-    Callback = function(v) S.AimbotShowFOV = v end
-})
-
-Tabs.Aimbot:AddSlider("Aimbot_FOV", {
-    Title = "FOV Radius",
-    Description = "Aimbot detection radius",
-    Default = 250,
-    Min = 50,
-    Max = 800,
-    Rounding = 0,
-    Callback = function(v) S.AimbotFOV = v end
-})
-
-Tabs.Aimbot:AddSlider("Aimbot_Smooth", {
-    Title = "Smoothness",
-    Description = "Lower = faster lock",
-    Default = 3,
-    Min = 1,
-    Max = 10,
-    Rounding = 0,
-    Callback = function(v) S.AimbotSmooth = v end
-})
-
-Tabs.Aimbot:AddDropdown("Aimbot_Bone", {
-    Title = "Aim Bone",
-    Values = {"Head", "HumanoidRootPart", "UpperTorso", "LowerTorso"},
-    Default = "Head",
-    Callback = function(v) S.AimbotBone = v end
-})
-
--- ══════════════════════════════════════════
--- SETTINGS TAB
--- ══════════════════════════════════════════
-Tabs.Settings:AddSection("Info")
-Tabs.Settings:AddParagraph({
-    Title = "NERO SCRIPT v3.0",
-    Content = "Executor: " .. (getexecutorname and getexecutorname() or "Unknown") .. "\nDrawing API: " .. (hasDrawing and "Supported" or "Not Supported") .. "\nmousemoverel: " .. (hasMouse and "Supported" or "Not Supported")
-})
-
-Tabs.Settings:AddParagraph({
-    Title = "Keybinds",
-    Content = "RightShift = Minimize/Show Panel\nRMB (Hold) = Aimbot Lock"
-})
-
-SaveManager:SetLibrary(Fluent)
-InterfaceManager:SetLibrary(Fluent)
-SaveManager:IgnoreThemeSettings()
-SaveManager:SetIgnoreIndexes({})
-InterfaceManager:SetFolder("NeroScript")
-SaveManager:SetFolder("NeroScript/saves")
-InterfaceManager:BuildInterfaceSection(Tabs.Settings)
-SaveManager:BuildConfigSection(Tabs.Settings)
-
-Window:SelectTab(1)
-
-Fluent:Notify({
-    Title = "Nero Script",
-    Content = "Loaded successfully! RightShift = Toggle",
-    Duration = 5
-})
-
--- ══════════════════════════════════════════
--- ESP SYSTEM
--- ══════════════════════════════════════════
-ESP_Objects = {}
-
-local function createESP(player)
-    if player == LP then return end
-    local esp = {}
-    
-    if hasDrawing then
-        pcall(function()
-            esp.BoxOutline = Drawing.new("Square"); esp.BoxOutline.Visible = false; esp.BoxOutline.Color = Color3.new(0,0,0); esp.BoxOutline.Thickness = 3; esp.BoxOutline.Filled = false
-            esp.Box = Drawing.new("Square"); esp.Box.Visible = false; esp.Box.Color = S.ESP_Color; esp.Box.Thickness = 1; esp.Box.Filled = false
-            esp.Name = Drawing.new("Text"); esp.Name.Visible = false; esp.Name.Color = Color3.new(1,1,1); esp.Name.Size = 14; esp.Name.Center = true; esp.Name.Outline = true
-            esp.HPOutline = Drawing.new("Line"); esp.HPOutline.Visible = false; esp.HPOutline.Color = Color3.new(0,0,0); esp.HPOutline.Thickness = 4
-            esp.HP = Drawing.new("Line"); esp.HP.Visible = false; esp.HP.Color = Color3.fromRGB(0,255,0); esp.HP.Thickness = 2
-            esp.Dist = Drawing.new("Text"); esp.Dist.Visible = false; esp.Dist.Color = Color3.fromRGB(200,200,200); esp.Dist.Size = 12; esp.Dist.Center = true; esp.Dist.Outline = true
-            esp.UseDrawing = true
-        end)
-    end
-    
-    if not esp.UseDrawing then
-        pcall(function()
-            local bb = Instance.new("BillboardGui"); bb.Name = "NeroESP"; bb.Size = UDim2.new(4,0,6,0); bb.AlwaysOnTop = true; bb.LightInfluence = 0; bb.MaxDistance = 500
-            local fr = Instance.new("Frame"); fr.Size = UDim2.new(1,0,1,0); fr.BackgroundTransparency = 1; fr.BorderSizePixel = 2; fr.BorderColor3 = S.ESP_Color; fr.Parent = bb
-            local nl = Instance.new("TextLabel"); nl.Size = UDim2.new(1,0,0,16); nl.Position = UDim2.new(0,0,0,-18); nl.BackgroundTransparency = 1; nl.TextColor3 = Color3.new(1,1,1); nl.TextStrokeTransparency = 0; nl.TextSize = 14; nl.Font = Enum.Font.GothamBold; nl.Parent = fr
-            local dl = Instance.new("TextLabel"); dl.Size = UDim2.new(1,0,0,14); dl.Position = UDim2.new(0,0,1,2); dl.BackgroundTransparency = 1; dl.TextColor3 = Color3.fromRGB(200,200,200); dl.TextStrokeTransparency = 0; dl.TextSize = 12; dl.Font = Enum.Font.Gotham; dl.Parent = fr
-            local hb = Instance.new("Frame"); hb.Size = UDim2.new(0.05,0,1,0); hb.Position = UDim2.new(0,-6,0,0); hb.BackgroundColor3 = Color3.fromRGB(0,255,0); hb.BorderSizePixel = 0; hb.Parent = fr
-            esp.Billboard = bb; esp.Frame = fr; esp.NameLabel = nl; esp.DistLabel = dl; esp.HPBar = hb; esp.UseDrawing = false
-        end)
-    end
-    
-    ESP_Objects[player] = esp
+local function createESP(plr)
+    local drawings = {
+        BoxOutline = Drawing.new("Square"), Box = Drawing.new("Square"),
+        Name = Drawing.new("Text"), Health = Drawing.new("Text"), Distance = Drawing.new("Text"),
+        TracerOutline = Drawing.new("Line"), Tracer = Drawing.new("Line"),
+        HPBarOutline = Drawing.new("Line"), HPBar = Drawing.new("Line"),
+    }
+    drawings.BoxOutline.Thickness = 3 drawings.BoxOutline.Filled = false drawings.BoxOutline.Color = Color3.new(0,0,0) drawings.BoxOutline.Visible = false
+    drawings.Box.Thickness = 1 drawings.Box.Filled = false drawings.Box.Visible = false
+    drawings.Name.Size = 14 drawings.Name.Center = true drawings.Name.Outline = true drawings.Name.Visible = false
+    drawings.Health.Size = 12 drawings.Health.Center = true drawings.Health.Outline = true drawings.Health.Visible = false
+    drawings.Distance.Size = 12 drawings.Distance.Center = true drawings.Distance.Outline = true drawings.Distance.Visible = false
+    drawings.TracerOutline.Thickness = 3 drawings.TracerOutline.Color = Color3.new(0,0,0) drawings.TracerOutline.Visible = false
+    drawings.Tracer.Thickness = 1 drawings.Tracer.Visible = false
+    drawings.HPBarOutline.Thickness = 4 drawings.HPBarOutline.Color = Color3.new(0,0,0) drawings.HPBarOutline.Visible = false
+    drawings.HPBar.Thickness = 2 drawings.HPBar.Visible = false
+    ESPObjects[plr] = drawings
 end
 
-local function removeESP(player)
-    local esp = ESP_Objects[player]
-    if esp then
-        pcall(function()
-            if esp.UseDrawing then
-                for _, obj in pairs(esp) do if type(obj) ~= "boolean" then pcall(function() obj:Remove() end) end end
-            else esp.Billboard:Destroy() end
-        end)
-        ESP_Objects[player] = nil
+local function removeESP(plr)
+    if ESPObjects[plr] then
+        for _, obj in pairs(ESPObjects[plr]) do pcall(function() obj:Remove() end) end
+        ESPObjects[plr] = nil
     end
 end
 
-local function updateESP()
-    for player, esp in pairs(ESP_Objects) do
-        local hide = function()
-            if esp.UseDrawing then
-                for _, obj in pairs(esp) do if type(obj) ~= "boolean" then pcall(function() obj.Visible = false end) end end
-            elseif esp.Billboard then pcall(function() esp.Billboard.Enabled = false end) end
-        end
-        
-        if not S.ESP or not player.Parent then hide() continue end
-        
-        local char = player.Character
-        local hum = char and char:FindFirstChild("Humanoid")
-        local root = char and char:FindFirstChild("HumanoidRootPart")
-        local head = char and char:FindFirstChild("Head")
-        if not char or not hum or not root or not head then hide() continue end
-        
-        if S.ESP_TeamCheck and player.Team == LP.Team and player.Team ~= nil then hide() continue end
-        
-        local col = (player.Team and player.Team == LP.Team) and S.ESP_TeamColor or S.ESP_Color
-        
-        if esp.UseDrawing then
-            local pos, onScreen = Camera:WorldToViewportPoint(root.Position)
-            if not onScreen then hide() continue end
-            
-            local sf = 1 / (pos.Z * 0.04)
-            local bw = math.clamp(4*sf, 2, 200)
-            local bh = math.clamp(5.5*sf, 2, 280)
-            local bx = pos.X - bw/2
-            local by = pos.Y - bh/2
-            
-            if S.ESP_Box then
-                esp.BoxOutline.Size = Vector2.new(bw,bh); esp.BoxOutline.Position = Vector2.new(bx,by); esp.BoxOutline.Visible = true
-                esp.Box.Size = Vector2.new(bw,bh); esp.Box.Position = Vector2.new(bx,by); esp.Box.Color = col; esp.Box.Visible = true
-            else esp.BoxOutline.Visible = false; esp.Box.Visible = false end
-            
-            if S.ESP_Name then esp.Name.Text = player.DisplayName or player.Name; esp.Name.Position = Vector2.new(pos.X, by-18); esp.Name.Visible = true
-            else esp.Name.Visible = false end
-            
-            if S.ESP_Health then
-                local hp = math.clamp(hum.Health/hum.MaxHealth, 0, 1)
-                esp.HPOutline.From = Vector2.new(bx-5,by); esp.HPOutline.To = Vector2.new(bx-5,by+bh); esp.HPOutline.Visible = true
-                esp.HP.From = Vector2.new(bx-5,by+bh-(bh*hp)); esp.HP.To = Vector2.new(bx-5,by+bh); esp.HP.Color = Color3.fromRGB(255*(1-hp),255*hp,0); esp.HP.Visible = true
-            else esp.HPOutline.Visible = false; esp.HP.Visible = false end
-            
-            if S.ESP_Distance then
-                local mr = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
-                if mr then esp.Dist.Text = string.format("[%dm]", math.floor((mr.Position-root.Position).Magnitude)); esp.Dist.Position = Vector2.new(pos.X,by+bh+4); esp.Dist.Visible = true end
-            else esp.Dist.Visible = false end
-        else
-            if not esp.Billboard then continue end
-            local mr = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
-            esp.Billboard.Enabled = true; esp.Billboard.Adornee = head; esp.NameLabel.Text = player.DisplayName or player.Name; esp.Frame.BorderColor3 = col
-            if mr then esp.DistLabel.Text = string.format("[%dm]", math.floor((mr.Position-root.Position).Magnitude)) end
-            local hp = math.clamp(hum.Health/hum.MaxHealth, 0, 1)
-            esp.HPBar.Size = UDim2.new(0.05,0,hp,0); esp.HPBar.Position = UDim2.new(0,-6,1-hp,0); esp.HPBar.BackgroundColor3 = Color3.fromRGB(255*(1-hp),255*hp,0)
-            esp.Frame.Visible = S.ESP_Box; esp.NameLabel.Visible = S.ESP_Name; esp.DistLabel.Visible = S.ESP_Distance; esp.HPBar.Visible = S.ESP_Health
-        end
-    end
+local function worldToScreen(pos)
+    local sp, onScreen = Camera:WorldToViewportPoint(pos)
+    return Vector2.new(sp.X, sp.Y), onScreen
+end
+
+local function getBoundingBox(char)
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return nil end
+    local top = char:FindFirstChild("Head") and char.Head.Position or (root.Position + Vector3.new(0, 3, 0))
+    local bottom = root.Position - Vector3.new(0, 3, 0)
+    local topScreen, topVis = worldToScreen(top)
+    local bottomScreen, bottomVis = worldToScreen(bottom)
+    if not topVis and not bottomVis then return nil end
+    local height = math.abs(topScreen.Y - bottomScreen.Y)
+    local width = height / 1.8
+    local center = (topScreen + bottomScreen) / 2
+    return {Pos = center, Width = width, Height = height}
 end
 
 -- ══════════════════════════════════════════
--- SPEED
+-- AIMBOT FUNCTIONS
 -- ══════════════════════════════════════════
-local function updateSpeed()
-    local char = LP.Character
-    if not char then return end
-    local hum = char:FindFirstChild("Humanoid")
-    if not hum then return end
-    hum.WalkSpeed = S.Speed and (16 * S.SpeedMul) or 16
+local function isAlive(plr)
+    local c = plr.Character
+    return c and c:FindFirstChild("Humanoid") and c.Humanoid.Health > 0
 end
 
--- ══════════════════════════════════════════
--- AIMBOT
--- ══════════════════════════════════════════
-local FOVCircle = nil
-if hasDrawing then
-    pcall(function()
-        FOVCircle = Drawing.new("Circle")
-        FOVCircle.Visible = false; FOVCircle.Radius = S.AimbotFOV; FOVCircle.Color = Color3.fromRGB(255,255,255)
-        FOVCircle.Thickness = 1; FOVCircle.Filled = false; FOVCircle.NumSides = 64; FOVCircle.Transparency = 0.7
-    end)
+local function isVisible(plr)
+    local c = plr.Character
+    if not c then return false end
+    local head = c:FindFirstChild("Head")
+    if not head then return false end
+    local origin = Camera.CFrame.Position
+    local dir = (head.Position - origin)
+    local params = RaycastParams.new()
+    params.FilterDescendantsInstances = {Char, c}
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    local result = workspace:Raycast(origin, dir, params)
+    return result == nil
 end
 
 local function getClosest()
-    local closest, closestDist = nil, S.AimbotFOV
-    local sc = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
-    for _, p in pairs(Players:GetPlayers()) do
-        if p == LP then continue end
-        if not p.Character then continue end
-        if S.AimbotTeam and p.Team and p.Team == LP.Team then continue end
-        local bp = p.Character:FindFirstChild(S.AimbotBone)
-        if not bp then continue end
-        if S.AimbotVis then
-            local mr = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
-            if mr then
-                local rp = RaycastParams.new(); rp.FilterType = Enum.RaycastFilterType.Exclude; rp.FilterDescendantsInstances = {LP.Character}
-                local r = workspace:Raycast(mr.Position, (bp.Position-mr.Position), rp)
-                if r and not r.Instance:IsDescendantOf(p.Character) then continue end
-            end
+    local closest, minDist = nil, S.AimbotFOV
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr == LP then continue end
+        if S.AimbotTeam and plr.Team == LP.Team then continue end
+        if not isAlive(plr) then continue end
+        local c = plr.Character
+        local part = c:FindFirstChild(S.AimbotBone)
+        if not part then continue end
+        if S.AimbotVis and not isVisible(plr) then continue end
+        local sp, vis = worldToScreen(part.Position)
+        if not vis then continue end
+        local dist = (sp - UIS:GetMouseLocation()).Magnitude
+        if dist < minDist then
+            minDist = dist
+            closest = part
         end
-        local sp, onScr = Camera:WorldToViewportPoint(bp.Position)
-        if not onScr then continue end
-        local d = (Vector2.new(sp.X,sp.Y) - sc).Magnitude
-        if d < closestDist then closest = p; closestDist = d end
     end
     return closest
 end
 
-local function aimAt(target)
-    if not target or not target.Character then return end
-    if not hasMouse then return end
-    local bp = target.Character:FindFirstChild(S.AimbotBone)
-    if not bp then return end
-    local sp = Camera:WorldToViewportPoint(bp.Position)
-    local sc = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
-    local d = (Vector2.new(sp.X,sp.Y) - sc) / S.AimbotSmooth
-    mousemoverel(d.X, d.Y)
+-- ══════════════════════════════════════════
+-- GUI (Lightweight — no external libs)
+-- ══════════════════════════════════════════
+local guiVisible = true
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "NeroScriptGUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+local function safeParent(gui)
+    pcall(function() gui.Parent = game:GetService("CoreGui") end)
+    if not gui.Parent then
+        pcall(function() gui.Parent = LP:WaitForChild("PlayerGui") end)
+    end
+end
+safeParent(ScreenGui)
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 260, 0, 340)
+MainFrame.Position = UDim2.new(0.5, -130, 0.5, -170)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = UDim.new(0, 8)
+MainCorner.Parent = MainFrame
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+Title.BorderSizePixel = 0
+Title.Text = "⚡ NERO SCRIPT v4.0"
+Title.TextColor3 = Color3.new(1, 1, 1)
+Title.TextSize = 14
+Title.Font = Enum.Font.GothamBold
+Title.Parent = MainFrame
+
+local TitleCorner = Instance.new("UICorner")
+TitleCorner.CornerRadius = UDim.new(0, 8)
+TitleCorner.Parent = Title
+
+-- ══════════════════════════════════════════
+-- TOGGLE BUTTON FACTORY
+-- ══════════════════════════════════════════
+local yOff = 35
+
+local function createToggle(name, default, callback)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, -20, 0, 28)
+    btn.Position = UDim2.new(0, 10, 0, yOff)
+    btn.BackgroundColor3 = default and Color3.fromRGB(50, 180, 50) or Color3.fromRGB(60, 60, 65)
+    btn.BorderSizePixel = 0
+    btn.Text = (default and "✅ " or "❌ ") .. name
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.TextSize = 12
+    btn.Font = Enum.Font.GothamSemibold
+    btn.Parent = MainFrame
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = btn
+
+    local state = default
+    btn.MouseButton1Click:Connect(function()
+        state = not state
+        btn.BackgroundColor3 = state and Color3.fromRGB(50, 180, 50) or Color3.fromRGB(60, 60, 65)
+        btn.Text = (state and "✅ " or "❌ ") .. name
+        callback(state)
+    end)
+
+    yOff = yOff + 32
+    return btn
+end
+
+local function createLabel(text)
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(1, -20, 0, 20)
+    lbl.Position = UDim2.new(0, 10, 0, yOff)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = text
+    lbl.TextColor3 = Color3.fromRGB(255, 80, 80)
+    lbl.TextSize = 11
+    lbl.Font = Enum.Font.GothamBold
+    lbl.Parent = MainFrame
+    yOff = yOff + 22
+    return lbl
 end
 
 -- ══════════════════════════════════════════
--- MAIN LOOPS
+-- GUI ELEMENTS
 -- ══════════════════════════════════════════
-RunService.RenderStepped:Connect(updateESP)
-RunService.Heartbeat:Connect(updateSpeed)
+createLabel("━━━━ ESP ━━━━")
+createToggle("ESP", false, function(v) S.ESP = v end)
+createToggle("ESP Team Check", true, function(v) S.ESP_TeamCheck = v end)
 
+createLabel("━━━━ PLAYER ━━━━")
+createToggle("Speed Hack", false, function(v)
+    S.Speed = v
+    pcall(function()
+        if not v and Char and Char:FindFirstChild("Humanoid") then
+            Char.Humanoid.WalkSpeed = 16
+        end
+    end)
+end)
+
+createLabel("━━━━ AIMBOT ━━━━")
+createToggle("Aimbot", false, function(v) S.Aimbot = v end)
+createToggle("Visibility Check", true, function(v) S.AimbotVis = v end)
+createToggle("Team Check", true, function(v) S.AimbotTeam = v end)
+createToggle("Show FOV Circle", false, function(v) S.AimbotShowFOV = v end)
+
+-- ══════════════════════════════════════════
+-- FOV CIRCLE
+-- ══════════════════════════════════════════
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Radius = S.AimbotFOV
+FOVCircle.Thickness = 1
+FOVCircle.Color = Color3.fromRGB(255, 255, 255)
+FOVCircle.Filled = false
+FOVCircle.Transparency = 0.7
+FOVCircle.Visible = false
+
+-- ══════════════════════════════════════════
+-- MAIN LOOP
+-- ══════════════════════════════════════════
 RunService.RenderStepped:Connect(function()
-    if FOVCircle then
-        FOVCircle.Position = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
-        FOVCircle.Radius = S.AimbotFOV
-        FOVCircle.Visible = S.Aimbot and S.AimbotShowFOV
-    end
-    if S.Aimbot and S.AimbotHeld then
-        local t = getClosest()
-        if t then aimAt(t) end
+    -- Update FOV circle
+    FOVCircle.Visible = S.Aimbot and S.AimbotShowFOV
+    FOVCircle.Position = UIS:GetMouseLocation()
+    FOVCircle.Radius = S.AimbotFOV
+
+    -- Speed Hack
+    pcall(function()
+        if S.Speed and Char and Char:FindFirstChild("Humanoid") then
+            Char.Humanoid.WalkSpeed = 16 * S.SpeedMul
+        end
+    end)
+
+    -- ESP
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr == LP then continue end
+        if not ESPObjects[plr] then createESP(plr) end
+        local drawings = ESPObjects[plr]
+
+        local show = S.ESP and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart")
+        if show and S.ESP_TeamCheck and plr.Team == LP.Team then show = false end
+
+        if show then
+            local bb = getBoundingBox(plr.Character)
+            if bb then
+                local color = S.ESP_Color
+                if S.ESP_TeamCheck and plr.Team == LP.Team then color = S.ESP_TeamColor end
+
+                -- Box
+                drawings.BoxOutline.Size = Vector2.new(bb.Width, bb.Height)
+                drawings.BoxOutline.Position = Vector2.new(bb.Pos.X - bb.Width/2, bb.Pos.Y - bb.Height/2)
+                drawings.BoxOutline.Visible = true
+                drawings.Box.Size = drawings.BoxOutline.Size
+                drawings.Box.Position = drawings.BoxOutline.Position
+                drawings.Box.Color = color
+                drawings.Box.Visible = true
+
+                -- Name
+                if S.ESP_Name then
+                    drawings.Name.Position = Vector2.new(bb.Pos.X, bb.Pos.Y - bb.Height/2 - 16)
+                    drawings.Name.Text = plr.Name
+                    drawings.Name.Color = color
+                    drawings.Name.Visible = true
+                else drawings.Name.Visible = false end
+
+                -- Health
+                if S.ESP_Health then
+                    local hp = plr.Character:FindFirstChild("Humanoid") and math.floor(plr.Character.Humanoid.Health) or "?"
+                    drawings.Health.Position = Vector2.new(bb.Pos.X, bb.Pos.Y - bb.Height/2 - 30)
+                    drawings.Health.Text = "HP: " .. hp
+                    drawings.Health.Color = color
+                    drawings.Health.Visible = true
+                else drawings.Health.Visible = false end
+
+                -- Distance
+                if S.ESP_Distance then
+                    local dist = math.floor((Char.HumanoidRootPart.Position - plr.Character.HumanoidRootPart.Position).Magnitude)
+                    drawings.Distance.Position = Vector2.new(bb.Pos.X, bb.Pos.Y + bb.Height/2 + 4)
+                    drawings.Distance.Text = dist .. "m"
+                    drawings.Distance.Color = color
+                    drawings.Distance.Visible = true
+                else drawings.Distance.Visible = false end
+
+                -- Tracer
+                drawings.TracerOutline.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+                drawings.TracerOutline.To = bb.Pos
+                drawings.TracerOutline.Visible = true
+                drawings.Tracer.From = drawings.TracerOutline.From
+                drawings.Tracer.To = bb.Pos
+                drawings.Tracer.Color = color
+                drawings.Tracer.Visible = true
+
+                -- HP Bar
+                if plr.Character:FindFirstChild("Humanoid") then
+                    local hpPct = plr.Character.Humanoid.Health / plr.Character.Humanoid.MaxHealth
+                    local barX = bb.Pos.X - bb.Width/2 - 6
+                    drawings.HPBarOutline.From = Vector2.new(barX, bb.Pos.Y - bb.Height/2)
+                    drawings.HPBarOutline.To = Vector2.new(barX, bb.Pos.Y + bb.Height/2)
+                    drawings.HPBarOutline.Visible = true
+                    drawings.HPBar.From = Vector2.new(barX, bb.Pos.Y + bb.Height/2)
+                    drawings.HPBar.To = Vector2.new(barX, bb.Pos.Y + bb.Height/2 - bb.Height * hpPct)
+                    drawings.HPBar.Color = Color3.fromRGB(255 * (1-hpPct), 255 * hpPct, 0)
+                    drawings.HPBar.Visible = true
+                end
+            else
+                for _, obj in pairs(drawings) do
+                    if typeof(obj) ~= "Instance" then pcall(function() obj.Visible = false end) end
+                end
+            end
+        else
+            for _, obj in pairs(drawings) do
+                if typeof(obj) ~= "Instance" then pcall(function() obj.Visible = false end) end
+            end
+        end
     end
 end)
 
--- Input
+-- ══════════════════════════════════════════
+-- AIMBOT LOOP (separate, smoother)
+-- ══════════════════════════════════════════
+RunService.RenderStepped:Connect(function()
+    if not S.Aimbot then return end
+    local holding = S.AimbotHeld and UIS:IsMouseButtonPressed(S.AimbotKey)
+    if S.AimbotHeld and not holding then return end
+    local target = getClosest()
+    if target then
+        local sp = Camera:WorldToViewportPoint(target.Position)
+        local mousePos = UIS:GetMouseLocation()
+        local moveX = (sp.X - mousePos.X) / S.AimbotSmooth
+        local moveY = (sp.Y - mousePos.Y) / S.AimbotSmooth
+        mousemoverel(moveX, moveY)
+    end
+end)
+
+-- ══════════════════════════════════════════
+-- CHARACTER RESPAWN HANDLER
+-- ══════════════════════════════════════════
+LP.CharacterAdded:Connect(function(newChar)
+    Char = newChar
+    Humanoid = newChar:WaitForChild("Humanoid")
+end)
+
+-- ══════════════════════════════════════════
+-- PLAYER LEAVE CLEANUP
+-- ══════════════════════════════════════════
+Players.PlayerRemoving:Connect(function(plr)
+    removeESP(plr)
+end)
+
+-- ══════════════════════════════════════════
+-- TOGGLE GUI (RightShift)
+-- ══════════════════════════════════════════
 UIS.InputBegan:Connect(function(input, gpe)
     if gpe then return end
-    if input.UserInputType == S.AimbotKey then S.AimbotHeld = true end
+    if input.KeyCode == Enum.KeyCode.RightShift then
+        guiVisible = not guiVisible
+        MainFrame.Visible = guiVisible
+    end
 end)
 
-UIS.InputEnded:Connect(function(input)
-    if input.UserInputType == S.AimbotKey then S.AimbotHeld = false end
-end)
-
--- Player tracking
-for _, p in pairs(Players:GetPlayers()) do createESP(p) end
-Players.PlayerAdded:Connect(function(p) createESP(p) end)
-Players.PlayerRemoving:Connect(function(p) removeESP(p) end)
-LP.CharacterAdded:Connect(function() task.wait(1) updateSpeed() end)
+print("[Nero Script] v4.0 loaded — RightShift to toggle GUI")
